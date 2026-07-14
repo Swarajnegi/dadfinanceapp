@@ -1,0 +1,5 @@
+CREATE TABLE users(id INTEGER PRIMARY KEY,name TEXT NOT NULL);
+CREATE TABLE investments(id INTEGER PRIMARY KEY,user_id INTEGER,name TEXT,type TEXT,issuer TEXT,amount REAL,interest_rate REAL,payout_frequency TEXT,rating TEXT,maturity_date TEXT);
+CREATE TABLE cash_flow_profiles(id INTEGER PRIMARY KEY,user_id INTEGER,pension REAL,project_income REAL,other_income REAL,housing_expense REAL,food_expense REAL,medical_expense REAL,other_expense REAL);
+CREATE TABLE net_worth_profiles(id INTEGER PRIMARY KEY,user_id INTEGER,bank_balance REAL,cash_on_hand REAL,property_value REAL,other_assets REAL,home_loan REAL,personal_loan REAL,credit_card_dues REAL,other_debt REAL);
+CREATE TABLE emergency_funds(id INTEGER PRIMARY KEY,user_id INTEGER,monthly_essential_expense REAL,target_months INTEGER,current_amount REAL);
