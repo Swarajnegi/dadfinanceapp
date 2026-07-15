@@ -28,7 +28,8 @@
     "@capacitor/local-notifications": "^8.2.0",
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
-    "@capgo/capacitor-native-biometric": "^8.6.2"
+    "@capgo/capacitor-native-biometric": "^8.6.2",
+    "pdfjs-dist": "^6.1.200"
   },
   "devDependencies": {
     "esbuild": "^0.28.1"

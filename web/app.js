@@ -73,6 +73,16 @@ document.addEventListener('alpine:init', () => {
         _allocationChart: null,
         _ratingChart: null,
 
+        // ── Import State (Phase 5) ───────────────────────────────────
+        importState: 'idle',
+        importFile: null,
+        importPassword: '',
+        importError: '',
+        importResults: null,
+        importSelections: {},
+        importDuplicateMode: 'skip',
+        importStats: null,
+
         // ════════════════════════════════════════════════════════════
         //  LIFECYCLE
         // ════════════════════════════════════════════════════════════
@@ -890,6 +900,198 @@ document.addEventListener('alpine:init', () => {
 
         // ── used by the pension input field (two-way without full update overhead)
         pensionInput: null, // tracks the draft input value
+
+        // ════════════════════════════════════════════════════════════
+        //  ACTIONS — IMPORT (Phase 5)
+        // ════════════════════════════════════════════════════════════
+        handleImportFile(event) {
+            const file = event.target.files[0];
+            if (file && file.type === 'application/pdf') {
+                this.importFile = file;
+                this.importError = '';
+                this.importResults = null;
+                this.importStats = null;
+                this.importState = 'idle';
+            }
+        },
+
+        handleImportDrop(event) {
+            const file = event.dataTransfer.files[0];
+            if (file && file.type === 'application/pdf') {
+                this.importFile = file;
+                this.importError = '';
+                this.importResults = null;
+                this.importStats = null;
+                this.importState = 'idle';
+            } else {
+                this.importError = 'Please drop a PDF file.';
+            }
+        },
+
+        async parseStatement() {
+            if (!this.importFile) return;
+
+            this.importState = 'loading';
+            this.importError = '';
+            this.importResults = null;
+            this.importStats = null;
+
+            try {
+                const text = await this.extractPdfText(this.importFile, this.importPassword);
+
+                if (!text || text.trim().length < 50) {
+                    this.importError = 'Could not extract text from this PDF. It may be image-based or corrupted. Please use the original PDF from your email.';
+                    this.importState = 'error';
+                    return;
+                }
+
+                // Use the parser engine
+                const result = window.RFMParser.parseStatement(text);
+
+                if (result.type === 'UNKNOWN') {
+                    this.importError = result.error;
+                    this.importState = 'error';
+                    return;
+                }
+
+                if (result.investments.length === 0) {
+                    this.importError = 'Statement was recognized as ' + result.type.replace('_', ' ') + ' but no holdings could be extracted. The PDF format may have changed.';
+                    this.importState = 'error';
+                    return;
+                }
+
+                this.importResults = result;
+                // Select all by default
+                this.importSelections = {};
+                result.investments.forEach((_, idx) => {
+                    this.importSelections[idx] = true;
+                });
+                this.importState = 'parsed';
+
+            } catch (err) {
+                console.error('Parse error:', err);
+                if (err.name === 'PasswordException' || (err.message && err.message.includes('password'))) {
+                    this.importError = 'Incorrect password. CAS files are usually encrypted with your PAN number (e.g., ABCDE1234F).';
+                } else {
+                    this.importError = 'Failed to parse PDF: ' + (err.message || 'Unknown error');
+                }
+                this.importState = 'error';
+            }
+        },
+
+        async extractPdfText(file, password) {
+            const pdfjsLib = window.pdfjsLib;
+            if (!pdfjsLib) {
+                throw new Error('PDF library not loaded. Please reload the app.');
+            }
+
+            const arrayBuffer = await file.arrayBuffer();
+            const loadingConfig = { data: arrayBuffer };
+            if (password) loadingConfig.password = password;
+
+            const pdf = await pdfjsLib.getDocument(loadingConfig).promise;
+
+            let fullText = '';
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                const pageText = content.items.map(item => item.str).join(' ');
+                fullText += pageText + '\n';
+            }
+
+            return fullText;
+        },
+
+        findDuplicate(newItem) {
+            // 1. Match by ISIN (strongest signal)
+            if (newItem.isin) {
+                const match = this.investments.find(inv => inv.isin === newItem.isin);
+                if (match) return match;
+            }
+            // 2. Fuzzy match by name + type
+            const newName = (newItem.name || '').toLowerCase().trim();
+            if (newName.length > 3) {
+                return this.investments.find(inv => {
+                    const existName = (inv.name || '').toLowerCase().trim();
+                    return existName === newName && inv.type === newItem.type;
+                });
+            }
+            return null;
+        },
+
+        toggleAllImports(checked) {
+            if (!this.importResults) return;
+            this.importResults.investments.forEach((_, idx) => {
+                this.importSelections[idx] = checked;
+            });
+        },
+
+        countSelectedImports() {
+            if (!this.importResults) return 0;
+            return this.importResults.investments.filter((_, idx) =>
+                this.importSelections[idx] !== false
+            ).length;
+        },
+
+        countDuplicateImports() {
+            if (!this.importResults) return 0;
+            return this.importResults.investments.filter(inv =>
+                this.findDuplicate(inv)
+            ).length;
+        },
+
+        importSelected() {
+            if (!this.importResults) return;
+
+            let imported = 0;
+            let duplicates = 0;
+            let skipped = 0;
+
+            this.importResults.investments.forEach((inv, idx) => {
+                // Skip unselected
+                if (this.importSelections[idx] === false) {
+                    skipped++;
+                    return;
+                }
+
+                const existing = this.findDuplicate(inv);
+
+                if (existing) {
+                    if (this.importDuplicateMode === 'skip') {
+                        duplicates++;
+                        return;
+                    }
+                    // Overwrite: update amount/units/nav but preserve manual edits
+                    const existIdx = this.investments.findIndex(i => i.id === existing.id);
+                    if (existIdx !== -1) {
+                        this.investments[existIdx] = {
+                            ...this.investments[existIdx],
+                            amount:       inv.amount,
+                            units:        inv.units,
+                            nav:          inv.nav,
+                            currentValue: inv.currentValue,
+                            isin:         inv.isin || this.investments[existIdx].isin,
+                            importSource: inv.importSource,
+                            importDate:   inv.importDate
+                        };
+                        duplicates++;
+                        imported++;
+                    }
+                } else {
+                    // New entry
+                    this.investments.push(inv);
+                    imported++;
+                }
+            });
+
+            // Trigger reactivity
+            this.investments = [...this.investments];
+
+            this.importStats = { total: this.importResults.investments.length, imported, duplicates, skipped };
+            this.importResults = null;
+            this.importFile = null;
+            this.importState = 'done';
+        },
 
         // ════════════════════════════════════════════════════════════
         //  UTILITIES
