@@ -78,6 +78,7 @@ document.addEventListener('alpine:init', () => {
         // ════════════════════════════════════════════════════════════
         init() {
             this.loadData();
+            this.initCapacitor();
             this.$watch('investments',  () => this.saveData(), { deep: true });
             this.$watch('cashflow',     () => this.saveData(), { deep: true });
             this.$watch('networth',     () => this.saveData(), { deep: true });
@@ -87,6 +88,49 @@ document.addEventListener('alpine:init', () => {
             this.$watch('pension',      () => this.saveData(), { deep: true });
             // ITR checklist state (UI-only, not persisted)
             this.itrCheckState = {};
+        },
+
+        async initCapacitor() {
+            const isNative = window.AppPlugins && window.AppPlugins.Capacitor.isNativePlatform();
+            if (!isNative) return;
+
+            const { App, NativeBiometric, SplashScreen, StatusBar, Style } = window.AppPlugins;
+
+            // Hide Splash Screen once Alpine is mounted and UI is ready
+            try { await SplashScreen.hide(); } catch (e) {}
+
+            // Match status bar to our slate-50 background color
+            try { 
+                await StatusBar.setStyle({ style: Style.Light });
+                await StatusBar.setBackgroundColor({ color: '#f8fafc' });
+            } catch (e) {}
+
+            const enforceBiometric = async () => {
+                try {
+                    const result = await NativeBiometric.isAvailable();
+                    if (result.isAvailable) {
+                        await NativeBiometric.verifyIdentity({
+                            reason: "Authenticate to access RFM",
+                            title: "RFM Secure Login",
+                        });
+                        // Verified successfully
+                    }
+                } catch (e) {
+                    // If they fail or cancel, block access by re-prompting
+                    alert("Authentication required to use RFM.");
+                    enforceBiometric();
+                }
+            };
+
+            // Lock on cold start
+            await enforceBiometric();
+
+            // Lock on resume (as requested by user)
+            App.addListener('appStateChange', ({ isActive }) => {
+                if (isActive) {
+                    enforceBiometric();
+                }
+            });
         },
 
         // ════════════════════════════════════════════════════════════
