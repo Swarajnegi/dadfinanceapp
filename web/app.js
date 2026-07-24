@@ -51,9 +51,17 @@ document.addEventListener('alpine:init', () => {
 
         goals: [],
 
+        // ── SIP & Recurring Investments (Phase 9) ───────────────────
+        sips: [],
+        addingSip: false,
+        editingSip: null,
+        editSipForm: {},
+
         // ── Investment Edit State (Deliverable 1) ───────────────────
         editingInv: null,
         editForm: {},
+        addingInv: false,
+        moreMenuOpen: false,
 
         // ── Goal Edit State (Deliverable 3) ─────────────────────────
         editingGoal: null,
@@ -61,12 +69,18 @@ document.addEventListener('alpine:init', () => {
 
         // ── Add Forms ───────────────────────────────────────────────
         newInv: {
-            name: '', type: 'Bond', issuer: '', amount: '',
-            rate: '', payout: 'Monthly', rating: '', maturityDate: ''
+            name: '', type: 'Stock', issuer: '', amount: '',
+            rate: '', payout: 'Monthly', rating: '', maturityDate: '',
+            ticker: '', units: '', buyPrice: '', currentPrice: ''
         },
         newGoal: {
             name: '', type: 'Emergency Fund',
             target: '', current: '', targetDate: ''
+        },
+        newSip: {
+            name: '', type: 'SIP', monthlyAmount: '',
+            dayOfMonth: 5, startDate: '', endDate: '',
+            status: 'Active', linkedInvestmentId: null, ticker: ''
         },
 
         // ── Internal chart instances (not reactive state) ────────────
@@ -77,11 +91,23 @@ document.addEventListener('alpine:init', () => {
         importState: 'idle',
         importFile: null,
         importPassword: '',
+        pdfPassword: '',
         importError: '',
         importResults: null,
         importSelections: {},
         importDuplicateMode: 'skip',
         importStats: null,
+
+        // ── Regenerative Wealth State ────────────────────────────────
+        regenWealth: {
+            apiKey:       '',
+            apiKeySet:    false,
+            showKeyInput: false,
+            loading:      false,
+            progressMsg:  '',
+            error:        '',
+            analysis:     null   // The cached/live analysis result object
+        },
 
         // ════════════════════════════════════════════════════════════
         //  LIFECYCLE
@@ -98,6 +124,15 @@ document.addEventListener('alpine:init', () => {
             this.$watch('pension',      () => this.saveData(), { deep: true });
             // ITR checklist state (UI-only, not persisted)
             this.itrCheckState = {};
+
+            // ── Regenerative Wealth: restore API key and load cached analysis ──
+            const savedKey = localStorage.getItem('rfm_gemini_key');
+            if (savedKey) {
+                this.regenWealth.apiKey    = savedKey;
+                this.regenWealth.apiKeySet = true;
+            }
+            const cached = window.RegenWealth?.loadCached();
+            if (cached) this.regenWealth.analysis = cached;
         },
 
         async initCapacitor() {
@@ -109,35 +144,53 @@ document.addEventListener('alpine:init', () => {
             // Hide Splash Screen once Alpine is mounted and UI is ready
             try { await SplashScreen.hide(); } catch (e) {}
 
-            // Match status bar to our slate-50 background color
+            // Match status bar to our dark background color
             try { 
-                await StatusBar.setStyle({ style: Style.Light });
-                await StatusBar.setBackgroundColor({ color: '#f8fafc' });
+                await StatusBar.setStyle({ style: Style.Dark });
+                await StatusBar.setBackgroundColor({ color: '#051424' });
             } catch (e) {}
 
+            let isPrompting = false;
+            let isAuthenticated = false;
+
             const enforceBiometric = async () => {
+                if (isPrompting || isAuthenticated) return;
+                isPrompting = true;
+
                 try {
                     const result = await NativeBiometric.isAvailable();
                     if (result.isAvailable) {
                         await NativeBiometric.verifyIdentity({
                             reason: "Authenticate to access RFM",
                             title: "RFM Secure Login",
+                            subtitle: "Confirm your fingerprint or face ID",
+                            description: "Touch the sensor to continue",
+                            negativeButtonText: "Cancel"
                         });
-                        // Verified successfully
+                        isAuthenticated = true;
                     }
                 } catch (e) {
-                    // If they fail or cancel, block access by re-prompting
-                    alert("Authentication required to use RFM.");
-                    enforceBiometric();
+                    console.error("Biometric authentication error:", e);
+                    isPrompting = false;
+                    isAuthenticated = false;
+                    
+                    // Delay slightly before retrying to allow system UI to settle
+                    setTimeout(() => {
+                        enforceBiometric();
+                    }, 500);
+                    return;
                 }
+                isPrompting = false;
             };
 
             // Lock on cold start
             await enforceBiometric();
 
-            // Lock on resume (as requested by user)
+            // Lock on resume when returning from background
             App.addListener('appStateChange', ({ isActive }) => {
-                if (isActive) {
+                if (!isActive) {
+                    isAuthenticated = false;
+                } else if (isActive && !isAuthenticated && !isPrompting) {
                     enforceBiometric();
                 }
             });
@@ -153,6 +206,7 @@ document.addEventListener('alpine:init', () => {
                 const p = JSON.parse(saved);
                 this.investments = p.investments || [];
                 this.goals       = p.goals       || [];
+                this.sips        = p.sips        || [];
 
                 // Pension: migrate old cashflow.pension if pension module not yet saved
                 if (p.pension) {
@@ -234,7 +288,8 @@ document.addEventListener('alpine:init', () => {
                 networth:    this.networth,
                 emergency:   this.emergency,
                 tax:         this.tax,
-                goals:       this.goals
+                goals:       this.goals,
+                sips:        this.sips
             }));
         },
 
@@ -252,7 +307,8 @@ document.addEventListener('alpine:init', () => {
             return Number(this.cashflow.housing)
                  + Number(this.cashflow.food)
                  + Number(this.cashflow.medical)
-                 + Number(this.cashflow.otherExpense);
+                 + Number(this.cashflow.otherExpense)
+                 + this.totalMonthlySipOutflow;  // Phase 9: SIP outflows are real expenses
         },
         get monthlySurplus() { return this.totalIncome - this.totalExpense; },
         get savingsRate() {
@@ -261,10 +317,74 @@ document.addEventListener('alpine:init', () => {
         },
 
         // ════════════════════════════════════════════════════════════
+        //  COMPUTED PROPERTIES — SIP & RECURRING (Phase 9)
+        // ════════════════════════════════════════════════════════════
+        get activeSips() {
+            return this.sips.filter(s => s.status === 'Active');
+        },
+        get totalMonthlySipOutflow() {
+            return this.activeSips.reduce((sum, s) => sum + Number(s.monthlyAmount || 0), 0);
+        },
+        get activeSipCount() {
+            return this.activeSips.length;
+        },
+        get totalSipInvestedToDate() {
+            return this.sips.reduce((sum, s) => {
+                if (!s.startDate) return sum;
+                const start  = new Date(s.startDate);
+                const end    = s.endDate ? new Date(s.endDate) : new Date();
+                const months = Math.max(0, (end.getFullYear() - start.getFullYear()) * 12
+                             + (end.getMonth() - start.getMonth()) + 1);
+                return sum + (Number(s.monthlyAmount || 0) * months);
+            }, 0);
+        },
+        get upcomingSipDebits() {
+            const today = new Date().getDate();
+            return this.activeSips
+                .slice()
+                .sort((a, b) => {
+                    const da = Number(a.dayOfMonth) >= today ? Number(a.dayOfMonth) : Number(a.dayOfMonth) + 31;
+                    const db = Number(b.dayOfMonth) >= today ? Number(b.dayOfMonth) : Number(b.dayOfMonth) + 31;
+                    return da - db;
+                });
+        },
+
+        // ════════════════════════════════════════════════════════════
+        //  VALUATION & P&L HELPERS (Phase 8: Dynamic Equity Engine)
+        // ════════════════════════════════════════════════════════════
+        getInvCurrentValue(inv) {
+            const units = Number(inv.units) || 0;
+            const currentPrice = Number(inv.currentPrice) || Number(inv.nav) || Number(inv.buyPrice) || 0;
+            if (units > 0 && currentPrice > 0) {
+                return units * currentPrice;
+            }
+            return Number(inv.currentValue) || Number(inv.amount) || 0;
+        },
+
+        getInvInvestedCost(inv) {
+            const units = Number(inv.units) || 0;
+            const buyPrice = Number(inv.buyPrice) || Number(inv.nav) || 0;
+            if (units > 0 && buyPrice > 0) {
+                return units * buyPrice;
+            }
+            return Number(inv.amount) || 0;
+        },
+
+        getInvPnL(inv) {
+            return this.getInvCurrentValue(inv) - this.getInvInvestedCost(inv);
+        },
+
+        getInvPnLPct(inv) {
+            const cost = this.getInvInvestedCost(inv);
+            if (cost <= 0) return '0.00';
+            return ((this.getInvPnL(inv) / cost) * 100).toFixed(2);
+        },
+
+        // ════════════════════════════════════════════════════════════
         //  COMPUTED PROPERTIES — NET WORTH
         // ════════════════════════════════════════════════════════════
         get totalAssets() {
-            const invTotal = this.investments.reduce((s, i) => s + Number(i.amount), 0);
+            const invTotal = this.investments.reduce((s, i) => s + this.getInvCurrentValue(i), 0);
             return Number(this.networth.bank)
                  + Number(this.networth.cash)
                  + Number(this.networth.property)
@@ -281,6 +401,26 @@ document.addEventListener('alpine:init', () => {
         get debtRatio() {
             if (this.totalAssets <= 0) return 0;
             return ((this.totalLiabilities / this.totalAssets) * 100).toFixed(1);
+        },
+
+        getAssetTotal(type) {
+            return this.investments
+                .filter(i => i.type === type)
+                .reduce((sum, i) => sum + this.getInvCurrentValue(i), 0);
+        },
+
+        get totalInvestedCost() {
+            return this.investments.reduce((s, i) => s + this.getInvInvestedCost(i), 0);
+        },
+
+        get totalUnrealizedPnL() {
+            return this.investments.reduce((s, i) => s + this.getInvPnL(i), 0);
+        },
+
+        get totalUnrealizedPnLPct() {
+            const cost = this.totalInvestedCost;
+            if (cost <= 0) return '0.00';
+            return ((this.totalUnrealizedPnL / cost) * 100).toFixed(2);
         },
 
         // ════════════════════════════════════════════════════════════
@@ -373,6 +513,13 @@ document.addEventListener('alpine:init', () => {
             return this.annualPension
                  + this.annualInterestIncome
                  + Number(this.tax.otherIncome);
+        },
+
+        get totalInterestIncome() { return this.annualInterestIncome; },
+        get totalTds() { return 0; }, // Placeholder for actual TDS
+        get netTaxPayable() {
+            const tax = Math.min(this.oldRegimeTax.tax, this.newRegimeTax.tax);
+            return Math.max(0, tax - this.totalTds);
         },
 
         // ── OLD REGIME CALCULATION ───────────────────────────────────
@@ -713,19 +860,37 @@ document.addEventListener('alpine:init', () => {
         },
 
         // ════════════════════════════════════════════════════════════
-        //  ACTIONS — INVESTMENTS (Deliverable 1: Edit)
+        //  ACTIONS — INVESTMENTS (Deliverable 1 & Phase 8)
         // ════════════════════════════════════════════════════════════
+        refreshingLivePrices: false,
+        livePriceMsg: '',
+
         addInvestment() {
-            if (!this.newInv.name || !this.newInv.amount || !this.newInv.rate) return;
+            if (!this.newInv.name) return;
+            const isEquity = ['Stock', 'Equity', 'Mutual Fund', 'ETF'].includes(this.newInv.type);
+            const units = Number(this.newInv.units) || 0;
+            const buyPrice = Number(this.newInv.buyPrice) || 0;
+            const currentPrice = Number(this.newInv.currentPrice) || buyPrice || 0;
+            
+            let amount = Number(this.newInv.amount) || 0;
+            if (isEquity && units > 0 && (currentPrice > 0 || buyPrice > 0)) {
+                amount = units * (currentPrice || buyPrice);
+            }
+
             this.investments.push({
                 ...this.newInv,
-                id:     Date.now(),
-                amount: Number(this.newInv.amount),
-                rate:   Number(this.newInv.rate)
+                id:           Date.now(),
+                amount:       amount,
+                units:        units,
+                buyPrice:     buyPrice,
+                currentPrice: currentPrice || buyPrice,
+                currentValue: amount,
+                rate:         Number(this.newInv.rate) || 0
             });
             this.newInv = {
-                name: '', type: 'Bond', issuer: '', amount: '',
-                rate: '', payout: 'Monthly', rating: '', maturityDate: ''
+                name: '', type: 'Stock', issuer: '', amount: '',
+                rate: '', payout: 'Monthly', rating: '', maturityDate: '',
+                ticker: '', units: '', buyPrice: '', currentPrice: ''
             };
         },
 
@@ -743,13 +908,108 @@ document.addEventListener('alpine:init', () => {
         saveEdit() {
             const idx = this.investments.findIndex(i => i.id === this.editForm.id);
             if (idx !== -1) {
-                this.editForm.amount = Number(this.editForm.amount);
-                this.editForm.rate   = Number(this.editForm.rate);
+                const isEquity = ['Stock', 'Equity', 'Mutual Fund', 'ETF'].includes(this.editForm.type);
+                const units = Number(this.editForm.units) || 0;
+                const buyPrice = Number(this.editForm.buyPrice) || 0;
+                const currentPrice = Number(this.editForm.currentPrice) || buyPrice || 0;
+                
+                let amount = Number(this.editForm.amount) || 0;
+                if (isEquity && units > 0 && (currentPrice > 0 || buyPrice > 0)) {
+                    amount = units * (currentPrice || buyPrice);
+                }
+
+                this.editForm.amount       = amount;
+                this.editForm.units        = units;
+                this.editForm.buyPrice     = buyPrice;
+                this.editForm.currentPrice = currentPrice || buyPrice;
+                this.editForm.currentValue = amount;
+                this.editForm.rate         = Number(this.editForm.rate) || 0;
+
                 this.investments[idx] = { ...this.editForm };
-                // Re-trigger Alpine reactivity on arrays
                 this.investments = [...this.investments];
             }
             this.editingInv = null;
+        },
+
+        async fetchLivePrices() {
+            if (this.investments.length === 0) return;
+            this.refreshingLivePrices = true;
+            this.livePriceMsg = 'Fetching live prices...';
+            let updatedCount = 0;
+
+            for (let inv of this.investments) {
+                const isEquity = ['Stock', 'Equity', 'Mutual Fund', 'ETF'].includes(inv.type);
+                if (!isEquity && !inv.ticker && !inv.isin) continue;
+
+                try {
+                    const newPrice = await this.fetchSingleLivePrice(inv);
+                    if (newPrice && newPrice > 0) {
+                        inv.currentPrice = newPrice;
+                        inv.nav          = newPrice;
+                        inv.lastUpdated  = new Date().toISOString();
+                        if (inv.units > 0) {
+                            inv.currentValue = inv.units * newPrice;
+                            inv.amount       = inv.currentValue;
+                        }
+                        updatedCount++;
+                    }
+                } catch (e) {
+                    console.warn(`Failed to update live price for ${inv.name}:`, e);
+                }
+            }
+
+            this.investments = [...this.investments];
+            this.refreshingLivePrices = false;
+            this.livePriceMsg = updatedCount > 0 ? `Updated ${updatedCount} asset prices!` : 'No prices found to update.';
+            setTimeout(() => { this.livePriceMsg = ''; }, 4000);
+        },
+
+        async fetchSingleLivePrice(inv) {
+            const ticker = (inv.ticker || '').trim();
+            const isin   = (inv.isin || '').trim();
+
+            // 1. Mutual Funds via AMFI API (api.mfapi.in)
+            if (inv.type === 'Mutual Fund' || /^\d{6}$/.test(ticker)) {
+                let schemeCode = ticker;
+                if (!/^\d{6}$/.test(schemeCode)) {
+                    const searchRes = await fetch(`https://api.mfapi.in/mf/search?q=${encodeURIComponent(inv.name)}`);
+                    if (searchRes.ok) {
+                        const list = await searchRes.json();
+                        if (list && list.length > 0) schemeCode = list[0].schemeCode;
+                    }
+                }
+                if (schemeCode && /^\d{6}$/.test(schemeCode)) {
+                    const res = await fetch(`https://api.mfapi.in/mf/${schemeCode}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        if (data && data.data && data.data.length > 0) {
+                            return parseFloat(data.data[0].nav);
+                        }
+                    }
+                }
+            }
+
+            // 2. Stocks / ETFs via Yahoo Finance (using allorigins / corsproxy)
+            if (ticker) {
+                let symbol = ticker.toUpperCase();
+                if (!symbol.includes('.') && inv.type !== 'US Stock') {
+                    symbol += '.NS';
+                }
+
+                const targetUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d`;
+                const proxyUrl  = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
+
+                const res = await fetch(proxyUrl);
+                if (res.ok) {
+                    const data = await res.json();
+                    const meta = data?.chart?.result?.[0]?.meta;
+                    if (meta && meta.regularMarketPrice) {
+                        return parseFloat(meta.regularMarketPrice);
+                    }
+                }
+            }
+
+            return null;
         },
 
         cancelEdit() { this.editingInv = null; },
@@ -778,18 +1038,18 @@ document.addEventListener('alpine:init', () => {
                             datasets: [{
                                 data:            Object.values(alloc),
                                 backgroundColor: [
-                                    '#0f766e','#0d9488','#14b8a6',
-                                    '#2dd4bf','#5eead4','#99f6e4'
+                                    '#00c9a7','#38debb','#5ffbd6',
+                                    '#d4af37','#f3d87f','#b8c8de'
                                 ],
                                 borderWidth: 2,
-                                borderColor: '#ffffff'
+                                borderColor: '#122131'
                             }]
                         },
                         options: {
                             responsive: true,
                             cutout: '65%',
                             plugins: {
-                                legend: { position: 'bottom', labels: { padding: 16, font: { size: 13 } } },
+                                legend: { position: 'bottom', labels: { color: '#bacac3', padding: 16, font: { size: 13 } } },
                                 tooltip: {
                                     callbacks: {
                                         label: ctx => {
@@ -815,7 +1075,7 @@ document.addEventListener('alpine:init', () => {
                             datasets: [{
                                 label:           'Amount (₹)',
                                 data:            Object.values(ratings),
-                                backgroundColor: '#0f766e',
+                                backgroundColor: '#00c9a7',
                                 borderRadius:    6
                             }]
                         },
@@ -826,8 +1086,14 @@ document.addEventListener('alpine:init', () => {
                             scales: {
                                 x: {
                                     ticks: {
+                                        color: '#bacac3',
                                         callback: v => '₹' + Number(v).toLocaleString('en-IN', { maximumFractionDigits: 0 })
-                                    }
+                                    },
+                                    grid: { color: 'rgba(255,255,255,0.05)' }
+                                },
+                                y: {
+                                    ticks: { color: '#bacac3' },
+                                    grid: { color: 'rgba(255,255,255,0.05)' }
                                 }
                             }
                         }
@@ -1103,6 +1369,223 @@ document.addEventListener('alpine:init', () => {
         formatDate(str) {
             if (!str) return '—';
             return new Date(str).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        },
+
+        // ════════════════════════════════════════════════════════════
+        //  REGENERATIVE WEALTH METHODS
+        // ════════════════════════════════════════════════════════════
+
+        // Save the Gemini API key to localStorage and mark as set
+        saveRegenApiKey() {
+            const key = (this.regenWealth.apiKey || '').trim();
+            if (key.length < 20) {
+                this.regenWealth.error = 'Please enter a valid Gemini API key (it starts with "AIzaSy").';
+                return;
+            }
+            localStorage.setItem('rfm_gemini_key', key);
+            this.regenWealth.apiKeySet    = true;
+            this.regenWealth.showKeyInput = false;
+            this.regenWealth.error        = '';
+        },
+
+        // Remove stored API key
+        clearRegenApiKey() {
+            localStorage.removeItem('rfm_gemini_key');
+            this.regenWealth.apiKey       = '';
+            this.regenWealth.apiKeySet    = false;
+            this.regenWealth.showKeyInput = false;
+            this.regenWealth.analysis     = null;
+            window.RegenWealth?.clearCache();
+        },
+
+        // Clear cached analysis and force fresh fetch
+        clearRegenCache() {
+            window.RegenWealth?.clearCache();
+            this.regenWealth.analysis = null;
+        },
+
+        // Main analysis runner — called by the Analyze button
+        async runRegenWealthAnalysis() {
+            if (!window.RegenWealth) {
+                this.regenWealth.error = 'Analysis engine not loaded. Please refresh the page.';
+                return;
+            }
+            if (!this.regenWealth.apiKeySet) {
+                this.regenWealth.showKeyInput = true;
+                return;
+            }
+
+            this.regenWealth.loading    = true;
+            this.regenWealth.error      = '';
+            this.regenWealth.progressMsg = 'Starting analysis...';
+
+            try {
+                const result = await window.RegenWealth.analyze(
+                    this.$data,
+                    this.regenWealth.apiKey,
+                    (msg) => { this.regenWealth.progressMsg = msg; }
+                );
+                this.regenWealth.analysis    = result;
+                this.regenWealth.progressMsg = '';
+            } catch (err) {
+                this.regenWealth.error       = err.message || 'Analysis failed. Please try again.';
+                this.regenWealth.progressMsg = '';
+            } finally {
+                this.regenWealth.loading = false;
+            }
+        },
+
+        // Helper: priority badge colour class
+        regenPriorityClass(priority) {
+            if (priority === 'High')   return 'bg-[#d4af37]/20 text-[#d4af37] border-[#d4af37]/40';
+            if (priority === 'Medium') return 'bg-primary-container/40 text-primary border-primary/30';
+            return 'bg-white/10 text-on-surface-variant border-white/10';
+        },
+
+        // Helper: priority glow class for card border
+        regenCardGlow(priority) {
+            if (priority === 'High')   return 'border-[#d4af37]/40 shadow-[0_8px_30px_rgba(212,175,55,0.15)]';
+            if (priority === 'Medium') return 'border-primary/30 shadow-[0_8px_30px_rgba(0,201,167,0.12)]';
+            return 'border-white/8 shadow-[0_4px_16px_rgba(0,0,0,0.3)]';
+        },
+
+        // Helper: asset class icon name
+        regenAssetIcon(assetClass) {
+            const map = {
+                'Gold': 'diamond', 'Sovereign Gold Bonds': 'diamond',
+                'Bonds': 'account_balance', 'RBI Bonds': 'account_balance',
+                'Fixed Deposits': 'savings', 'SCSS': 'savings',
+                'Mutual Funds': 'trending_up', 'PPF': 'savings',
+                'Equity': 'candlestick_chart',
+                'Real Estate': 'home', 'REITs': 'home',
+                'NPS': 'shield',
+            };
+            return map[assetClass] || 'auto_awesome';
+        },
+
+        // Helper: sentiment colour
+        regenSentimentClass(sentiment) {
+            if (!sentiment) return 'text-on-surface-variant';
+            const s = sentiment.toLowerCase();
+            if (s.includes('bullish')) return 'text-[#00c9a7]';
+            if (s.includes('bearish')) return 'text-red-400';
+            if (s.includes('cautious')) return 'text-[#d4af37]';
+            return 'text-on-surface-variant';
+        },
+
+        // ════════════════════════════════════════════════════════════
+        //  ACTIONS — BACKUP & RESTORE (Phase 7)
+        // ════════════════════════════════════════════════════════════
+        backupData() {
+            const data = localStorage.getItem('rfm_v1');
+            if (!data) {
+                alert('No data to backup.');
+                return;
+            }
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `rfm_backup_${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        },
+
+        async restoreData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            try {
+                const text = await file.text();
+                const parsed = JSON.parse(text);
+                
+                if (!parsed.version || !parsed.investments) {
+                    alert('Invalid backup file format.');
+                    return;
+                }
+
+                if (confirm('This will overwrite your current data. Are you sure you want to proceed?')) {
+                    localStorage.setItem('rfm_v1', JSON.stringify(parsed));
+                    // Reload data into state
+                    this.loadData();
+                    // Reset charts if they are rendered
+                    if (this.activePage === 'portfolio') {
+                        this.renderPortfolioCharts();
+                    }
+                    alert('Data restored successfully!');
+                }
+            } catch (err) {
+                console.error('Restore error:', err);
+                alert('Error reading backup file: ' + err.message);
+            }
+            // Reset file input so the same file can be selected again
+            event.target.value = '';
+        },
+
+        // ════════════════════════════════════════════════════════════
+        //  ACTIONS — SIP & RECURRING (Phase 9)
+        // ════════════════════════════════════════════════════════════
+        addSip() {
+            if (!this.newSip.name || !this.newSip.monthlyAmount) return;
+            this.sips.push({
+                ...this.newSip,
+                id:            Date.now(),
+                monthlyAmount: Number(this.newSip.monthlyAmount),
+                dayOfMonth:    Number(this.newSip.dayOfMonth) || 5
+            });
+            this.newSip = {
+                name: '', type: 'SIP', monthlyAmount: '',
+                dayOfMonth: 5, startDate: '', endDate: '',
+                status: 'Active', linkedInvestmentId: null, ticker: ''
+            };
+            this.addingSip = false;
+        },
+
+        deleteSip(id) {
+            if (confirm('Delete this recurring plan?')) {
+                this.sips = this.sips.filter(s => s.id !== id);
+            }
+        },
+
+        openEditSipModal(sip) {
+            this.editSipForm = { ...sip };
+            this.editingSip  = sip;
+        },
+
+        saveSipEdit() {
+            const idx = this.sips.findIndex(s => s.id === this.editSipForm.id);
+            if (idx !== -1) {
+                this.editSipForm.monthlyAmount = Number(this.editSipForm.monthlyAmount);
+                this.editSipForm.dayOfMonth    = Number(this.editSipForm.dayOfMonth) || 5;
+                this.sips[idx] = { ...this.editSipForm };
+                this.sips = [...this.sips];
+            }
+            this.editingSip = null;
+        },
+
+        cancelSipEdit() { this.editingSip = null; },
+
+        toggleSipStatus(sip) {
+            const idx = this.sips.findIndex(s => s.id === sip.id);
+            if (idx !== -1) {
+                this.sips[idx].status = this.sips[idx].status === 'Active' ? 'Paused' : 'Active';
+                this.sips = [...this.sips];
+            }
+        },
+
+        getSipLinkedName(sip) {
+            if (!sip.linkedInvestmentId) return '';
+            const inv = this.investments.find(i => i.id === sip.linkedInvestmentId);
+            return inv ? inv.name : '';
+        },
+
+        getSipDaysUntilDebit(sip) {
+            const today = new Date().getDate();
+            const debit = Number(sip.dayOfMonth);
+            const diff  = debit >= today ? debit - today : (31 - today) + debit;
+            return diff === 0 ? 'Today!' : `in ${diff} day${diff !== 1 ? 's' : ''}`;
         }
 
     }));
