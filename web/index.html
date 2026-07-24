@@ -102,7 +102,7 @@
 
             <!-- Mobile Navigation Overlay -->
             <div x-show="mobileMenuOpen"
-                 class="md:hidden absolute inset-0 z-40 bg-slate-900/97 backdrop-blur-sm"
+                 class="md:hidden fixed inset-0 z-40 bg-slate-900 backdrop-blur-md"
                  x-transition:enter="transition ease-out duration-200"
                  x-transition:enter-start="opacity-0"
                  x-transition:enter-end="opacity-100"
@@ -125,6 +125,7 @@
                         { id: 'networth',    name: '🏛️ Net Worth'       },
                         { id: 'emergency',   name: '🛡️ Emergency Fund'  },
                         { id: 'goals',       name: '🎯 My Goals'        },
+                        { id: 'sips',        name: '🔁 SIP & Recurring' },
                         { id: 'tax',         name: '📄 Tax Estimate'    },
                         { id: 'itr',         name: '✅ ITR Checklist'   },
                         { id: 'import',      name: '📥 Import Data'     }
