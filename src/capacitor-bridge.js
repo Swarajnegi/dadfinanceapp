@@ -9,10 +9,14 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 // ── pdf.js for client-side PDF parsing (Phase 5) ──
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Disable worker for simplicity — runs synchronously in main thread.
-// This is fine for single-file CAS PDFs (typically <100 pages).
-// A web worker can be added later for performance if needed.
-pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+// Use local worker script for 100% offline client-side PDF parsing
+try {
+    if (pdfjsLib.GlobalWorkerOptions) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.mjs';
+    }
+} catch (e) {
+    console.warn("Failed to set PDF workerSrc:", e);
+}
 
 window.AppPlugins = {
     Capacitor,

@@ -1404,6 +1404,10 @@ document.addEventListener('alpine:init', () => {
                 throw new Error('PDF library not loaded. Please reload the app.');
             }
 
+            if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.mjs';
+            }
+
             const arrayBuffer = await file.arrayBuffer();
             const loadingConfig = { data: arrayBuffer };
             if (password) loadingConfig.password = password;
