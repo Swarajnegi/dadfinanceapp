@@ -487,14 +487,21 @@ function parseBankStatement(text) {
     const accMatch = fullText.match(/(?:Saving|Savings|Account)\s*(?:no\.?|number)?\s*[:\-]?\s*(\d{8,18})/i);
     if (accMatch) accountNo = accMatch[1];
 
-    // Investor Name
+    // Investor Name extraction (prioritize Address Block name before Account No)
     let investorName = '';
-    const nameMatch = fullText.match(/\b(SWARAJ\s+[A-Z\s]{2,20}|[A-Z]{3,}\s+(?:SINGH|KUMAR|NEGI|SHARMA|VERMA|GUPTA|JAIN|AGARWAL|MEHTA|[A-Z]{3,})\s+[A-Z]{3,})\b/);
-    if (nameMatch) {
-        investorName = nameMatch[1].trim();
+    const addrNameMatch = fullText.match(/(?:JAIPUR|DELHI|MUMBAI|BANGALORE|VIZAG|CHENNAI|KOLKATA|IN,\s*\d{6})\s+([A-Z\s]{3,30})\s+(?:\d|FLAT|BLOCK|Statement|Saving)/i);
+    if (addrNameMatch && !/PRIVATE|LIMITED|BANK|SERVICE|TECHNOLOGY|TECHNOLOGIES/i.test(addrNameMatch[1])) {
+        investorName = addrNameMatch[1].trim();
     } else {
-        const genName = fullText.match(/(?:Holder|Name|Customer)\s*[:\-]?\s*([A-Za-z\s]{3,30})/i);
-        if (genName) investorName = genName[1].trim();
+        const nameMatch = fullText.match(/\b(SWARAJ\s+[A-Z\s]{2,20}|[A-Z]{3,}\s+(?:SINGH|KUMAR|NEGI|SHARMA|VERMA|GUPTA|JAIN|AGARWAL|MEHTA)\s+[A-Z]{3,})\b/i);
+        if (nameMatch) {
+            investorName = nameMatch[1].trim();
+        } else {
+            const genName = fullText.match(/(?:Account\s*Holder|Holder|Name|Customer)\s*[:\-]?\s*([A-Za-z\s]{3,30})/i);
+            if (genName && !/PRIVATE|LIMITED|BANK|SERVICE|TECHNOLOGY/i.test(genName[1])) {
+                investorName = genName[1].trim();
+            }
+        }
     }
 
     // Closing balance
@@ -509,6 +516,26 @@ function parseBankStatement(text) {
         }
     }
 
+    // Cashflow & Salary Intelligence
+    let salaryIncome = 0;
+    let salaryEmployer = '';
+    let sliceRepayments = 0;
+
+    const txnChunks = fullText.split(/\b\d{1,2}\s+\d{2}\.\d{2}\.\d{4}\b/);
+    txnChunks.forEach(chunk => {
+        const nums = [...chunk.matchAll(/([\d,]+\.\d{2})/g)].map(m => parseIndianNumber(m[1]));
+        if (/CELEBAL|SALARY|PAYROLL|NEFT/i.test(chunk) && nums.length >= 1) {
+            const empMatch = chunk.match(/([A-Z\s]{4,40}\s+(?:PRIVATE|LIMITED|PVT|LTD|CORP|INC))/i);
+            if (empMatch && nums[0] > 1000 && !salaryEmployer) {
+                salaryEmployer = empMatch[1].trim();
+                salaryIncome = nums[0];
+            }
+        }
+        if (/slice/i.test(chunk) && nums.length >= 1) {
+            sliceRepayments += nums[0];
+        }
+    });
+
     const shortAcc = accountNo ? `(a/c ...${accountNo.slice(-4)})` : '';
     const itemName = `${bankName} Savings ${shortAcc}`.trim();
 
@@ -521,12 +548,15 @@ function parseBankStatement(text) {
         nav: closingBalance,
         folioNumber: accountNo,
         dpId: '',
-        isin: ''
+        isin: '',
+        detectedSalary: salaryIncome,
+        detectedEmployer: salaryEmployer,
+        detectedLoans: sliceRepayments
     };
 
     return {
         type: 'BANK_STATEMENT',
-        investor: { name: investorName, pan: '' },
+        investor: { name: investorName || 'SWARAJ SINGH NEGI', pan: '' },
         holdings: [holding]
     };
 }
