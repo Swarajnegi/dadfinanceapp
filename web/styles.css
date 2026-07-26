@@ -2,8 +2,9 @@
 
 body {
     font-family: 'Inter', sans-serif;
-    background-color: #f8fafc;
-    color: #0f172a;
+    background-color: #051424;
+    color: #f8fafc;
+    overscroll-behavior-y: contain;
 }
 
 /* Hide scrollbar for sidebars and horizontal lists */

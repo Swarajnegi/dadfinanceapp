@@ -104,6 +104,9 @@ sips: []            // { id, name, type, monthlyAmount, dayOfMonth, startDate, e
 | 9 | SIP, RD & recurring cash flow auto-scheduler | `app.js` L54–84, L320–351 |
 | 10a | Stitch 3D Dark theme for Dashboard, Investments, Import, Tax screens | `index.html` |
 | 10b | Stitch 3D Dark theme for More Hub, Cash Flow, Net Worth, Pension, Emergency, Goals, Maturity | `index.html` |
+| 11 | Live Mutual Fund NAV (AMFI API) & Stock/ETF price ingestion (Yahoo Finance NSE) | `app.js`, `index.html` |
+| 12 | Native Android Maturity & SIP Payment Local Notifications (two channels, 7-day + same-day maturity, 12-month SIP) | `app.js`, `index.html`, `drawable/ic_stat_notification.xml` |
+| 13 | Universal AI Statement Classifier (Gemini 2.0 Flash zero-shot fallback for unrecognized bank/broker/insurance PDFs) | `app.js` (classifyWithAI), `index.html` (AI status bar, AI badge, AI loading state) |
 | Feature | Regenerative Wealth Engine (Live RSS News + Gemini 2.0 Flash AI Rebalancing) | `regenWealth.js`, `index.html` |
 
 ---

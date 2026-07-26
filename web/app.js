@@ -98,6 +98,12 @@ document.addEventListener('alpine:init', () => {
         isSearchingMf: false,
         mfSearchQuery: '',
 
+        // ── Phase 12: Native Local Notifications ─────────────────────
+        alertsState: 'idle',      // 'idle' | 'scheduling' | 'scheduled' | 'error' | 'unsupported'
+        alertsError: '',
+        scheduledAlertsCount: 0,
+        notifPermissionGranted: false,
+
         // ── Import State (Phase 5) ───────────────────────────────────
         importState: 'idle',
         importFile: null,
@@ -108,6 +114,16 @@ document.addEventListener('alpine:init', () => {
         importSelections: {},
         importDuplicateMode: 'skip',
         importStats: null,
+
+        // ── Phase 13: Universal AI Statement Classifier ──────────────
+        aiClassifier: {
+            enabled:    false,    // becomes true once apiKey is verified
+            status:     'idle',   // 'idle' | 'classifying' | 'done' | 'error'
+            error:      '',
+            usedAI:     false,    // marks if last import result came from AI
+            docType:    '',       // AI-detected document type
+            confidence: '',       // AI-stated confidence
+        },
 
         // ── Regenerative Wealth State ────────────────────────────────
         regenWealth: {
@@ -120,12 +136,22 @@ document.addEventListener('alpine:init', () => {
             analysis:     null   // The cached/live analysis result object
         },
 
+        // ── Pull-to-Refresh Gesture State ─────────────────────────────
+        pullToRefresh: {
+            distance: 0,
+            isRefreshing: false,
+            completed: false,
+            thresholdReached: false
+        },
+
         // ════════════════════════════════════════════════════════════
         //  LIFECYCLE
         // ════════════════════════════════════════════════════════════
         init() {
             this.loadData();
             this.initCapacitor();
+            // Phase 12: Schedule native alerts after data loads (fire-and-forget, non-blocking)
+            this.scheduleMaturityAlerts();
             this.$watch('investments',  () => this.saveData(), { deep: true });
             this.$watch('cashflow',     () => this.saveData(), { deep: true });
             this.$watch('networth',     () => this.saveData(), { deep: true });
@@ -144,6 +170,9 @@ document.addEventListener('alpine:init', () => {
             }
             const cached = window.RegenWealth?.loadCached();
             if (cached) this.regenWealth.analysis = cached;
+
+            // Mobile Pull-to-Refresh touch gesture listener initialization
+            this.initPullToRefresh();
         },
 
         async initCapacitor() {
@@ -160,6 +189,31 @@ document.addEventListener('alpine:init', () => {
                 await StatusBar.setStyle({ style: Style.Dark });
                 await StatusBar.setBackgroundColor({ color: '#051424' });
             } catch (e) {}
+
+            // Phase 12: Register Android notification channels (required on Android 8+ / API 26+)
+            try {
+                const { LocalNotifications } = window.AppPlugins;
+                if (LocalNotifications) {
+                    await LocalNotifications.createChannel({
+                        id:          'rfm_maturity',
+                        name:        'Maturity Alerts',
+                        description: 'FD and Bond maturity reminders',
+                        importance:  5,   // IMPORTANCE_HIGH
+                        visibility:  1,   // VISIBILITY_PUBLIC
+                        vibration:   true,
+                        sound:       'default'
+                    });
+                    await LocalNotifications.createChannel({
+                        id:          'rfm_sip',
+                        name:        'SIP Reminders',
+                        description: 'Monthly SIP payment debit reminders',
+                        importance:  4,   // IMPORTANCE_DEFAULT
+                        visibility:  1,
+                        vibration:   true,
+                        sound:       'default'
+                    });
+                }
+            } catch (e) { console.warn('[Phase 12] Channel creation failed:', e); }
 
             let isPrompting = false;
             let isAuthenticated = false;
@@ -211,6 +265,93 @@ document.addEventListener('alpine:init', () => {
                     enforceBiometric();
                 }
             });
+        },
+
+        // ════════════════════════════════════════════════════════════
+        //  PULL-TO-REFRESH MOBILE SWIPE GESTURE ENGINE
+        // ════════════════════════════════════════════════════════════
+        initPullToRefresh() {
+            let startY = 0;
+            let isTracking = false;
+
+            window.addEventListener('touchstart', (e) => {
+                if (window.scrollY <= 0 && e.touches.length === 1) {
+                    startY = e.touches[0].clientY;
+                    isTracking = true;
+                }
+            }, { passive: true });
+
+            window.addEventListener('touchmove', (e) => {
+                if (!isTracking || this.pullToRefresh.isRefreshing) return;
+
+                const currentY = e.touches[0].clientY;
+                const diffY = currentY - startY;
+
+                if (diffY > 0 && window.scrollY <= 0) {
+                    // Damped physical resistance calculation
+                    const damped = Math.min(Math.pow(diffY, 0.82) * 2.2, 110);
+                    this.pullToRefresh.distance = damped;
+
+                    // Haptic tactile feedback threshold at 70px pull
+                    if (damped >= 70 && !this.pullToRefresh.thresholdReached) {
+                        this.pullToRefresh.thresholdReached = true;
+                        if (navigator.vibrate) {
+                            try { navigator.vibrate(30); } catch (err) {}
+                        }
+                    } else if (damped < 70) {
+                        this.pullToRefresh.thresholdReached = false;
+                    }
+                } else {
+                    this.pullToRefresh.distance = 0;
+                }
+            }, { passive: true });
+
+            const handleTouchEnd = async () => {
+                if (!isTracking) return;
+                isTracking = false;
+
+                if (this.pullToRefresh.distance >= 70 && !this.pullToRefresh.isRefreshing) {
+                    await this.triggerPullRefresh();
+                } else {
+                    this.pullToRefresh.distance = 0;
+                    this.pullToRefresh.thresholdReached = false;
+                }
+            };
+
+            window.addEventListener('touchend', handleTouchEnd, { passive: true });
+            window.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+        },
+
+        async triggerPullRefresh() {
+            this.pullToRefresh.isRefreshing = true;
+            this.pullToRefresh.distance = 56;
+
+            try {
+                // 1. Refresh live Mutual Fund & Stock prices
+                if (typeof this.fetchLivePrices === 'function') {
+                    await this.fetchLivePrices();
+                }
+
+                // 2. Refresh native notifications schedule
+                if (typeof this.scheduleMaturityAlerts === 'function') {
+                    await this.scheduleMaturityAlerts();
+                }
+
+                // 3. Persist state
+                this.saveData();
+
+                // 4. Brief success state display
+                this.pullToRefresh.completed = true;
+                await new Promise(r => setTimeout(r, 600));
+
+            } catch (err) {
+                console.warn('Pull-to-refresh execution error:', err);
+            } finally {
+                this.pullToRefresh.distance = 0;
+                this.pullToRefresh.isRefreshing = false;
+                this.pullToRefresh.completed = false;
+                this.pullToRefresh.thresholdReached = false;
+            }
         },
 
         // ════════════════════════════════════════════════════════════
@@ -308,6 +449,10 @@ document.addEventListener('alpine:init', () => {
                 goals:       this.goals,
                 sips:        this.sips
             }));
+            // Phase 12: Re-schedule native alerts whenever portfolio data changes
+            // Debounced via a short delay to avoid hammering the plugin on rapid edits
+            clearTimeout(this._alertDebounce);
+            this._alertDebounce = setTimeout(() => this.scheduleMaturityAlerts(), 2000);
         },
 
         // ════════════════════════════════════════════════════════════
@@ -1457,21 +1602,58 @@ document.addEventListener('alpine:init', () => {
                     return;
                 }
 
-                // Use the parser engine
+                // Phase 5 regex-based parser
                 const result = window.RFMParser.parseStatement(text);
 
-                if (result.type === 'UNKNOWN') {
-                    this.importError = result.error;
-                    this.importState = 'error';
-                    return;
+                if (result.type === 'UNKNOWN' || result.investments.length === 0) {
+                    // Phase 13: AI Classifier fallback — attempt Gemini 2.0 Flash zero-shot classification
+                    const apiKey = localStorage.getItem('rfm_gemini_key');
+                    if (!apiKey) {
+                        // No API key — show helpful error pointing user to set one
+                        this.importError = result.investments.length === 0
+                            ? `Statement recognized as ${result.type.replace('_',' ')} but no holdings extracted. Try enabling AI Classifier (set your Gemini API key above) for unsupported formats.`
+                            : 'Statement format not recognized by the built-in parser. Enable AI Classifier by adding your Gemini API key above to handle any bank/broker format.';
+                        this.aiClassifier.status  = 'idle';
+                        this.importState = 'error';
+                        return;
+                    }
+
+                    // AI Classifier active
+                    this.importState = 'ai_classifying';
+                    this.aiClassifier.status  = 'classifying';
+                    this.aiClassifier.error   = '';
+                    this.aiClassifier.usedAI  = false;
+
+                    try {
+                        const aiResult = await this.classifyWithAI(text, apiKey);
+                        if (!aiResult || !aiResult.investments || aiResult.investments.length === 0) {
+                            throw new Error('AI returned no holdings. The PDF may be image-based or contain no financial data.');
+                        }
+                        // Merge AI result into the standard importResults shape
+                        this.importResults      = aiResult;
+                        this.aiClassifier.usedAI     = true;
+                        this.aiClassifier.docType    = aiResult.type || 'Unknown';
+                        this.aiClassifier.confidence = aiResult.aiConfidence || 'Medium';
+                        this.aiClassifier.status     = 'done';
+                        this.importSelections = {};
+                        aiResult.investments.forEach((_, idx) => {
+                            this.importSelections[idx] = true;
+                        });
+                        this.importState = 'parsed';
+                        return;
+                    } catch (aiErr) {
+                        console.error('[Phase 13] AI Classifier failed:', aiErr);
+                        this.aiClassifier.status  = 'error';
+                        this.aiClassifier.error   = aiErr.message;
+                        this.importError = 'AI Classifier failed: ' + aiErr.message;
+                        this.importState = 'error';
+                        return;
+                    }
                 }
 
-                if (result.investments.length === 0) {
-                    this.importError = 'Statement was recognized as ' + result.type.replace('_', ' ') + ' but no holdings could be extracted. The PDF format may have changed.';
-                    this.importState = 'error';
-                    return;
-                }
-
+                // Regex parser succeeded normally
+                this.aiClassifier.usedAI = false;
+                this.aiClassifier.status = 'idle';
                 this.importResults = result;
                 // Select all by default
                 this.importSelections = {};
@@ -1489,6 +1671,133 @@ document.addEventListener('alpine:init', () => {
                 }
                 this.importState = 'error';
             }
+        },
+
+        // ════════════════════════════════════════════════════════════
+        //  PHASE 13: UNIVERSAL AI STATEMENT CLASSIFIER
+        //  Uses Gemini 2.0 Flash with JSON mode to zero-shot classify
+        //  any bank statement, credit card, broker P&L, or insurance PDF
+        // ════════════════════════════════════════════════════════════
+
+        async classifyWithAI(rawText, apiKey) {
+            const GEMINI_ENDPOINT =
+                'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+
+            // Trim text to keep within token limits (~12K chars ~ 3K tokens)
+            const truncated = rawText.length > 12000
+                ? rawText.slice(0, 12000) + '\n[...document truncated for analysis...]'
+                : rawText;
+
+            const prompt = `You are a financial document parser for an Indian personal finance app. Your ONLY task is to extract structured financial data from the document text below.
+
+Classify the document and extract all financial holdings, transactions, or policies into structured JSON.
+
+## DOCUMENT TEXT:
+"""
+${truncated}
+"""
+
+## CLASSIFICATION TYPES:
+- BANK_STATEMENT — savings/current account transactions
+- CREDIT_CARD_STATEMENT — credit card transactions and outstanding
+- CAS_STATEMENT — CAMS/KFintech Consolidated Account Statement (mutual funds)
+- BROKER_PL — broker P&L / capital gains statement
+- INSURANCE_POLICY — LIC or other insurance policy document
+- FD_RECEIPT — Fixed Deposit receipt or advice
+- BOND_STATEMENT — government/corporate bond holding statement
+- EPFO_STATEMENT — PF/EPF passbook statement
+- NPS_STATEMENT — National Pension System statement
+
+## OUTPUT FORMAT (strict JSON, no markdown):
+{
+  "type": "<one of the CLASSIFICATION TYPES above>",
+  "aiConfidence": "High|Medium|Low",
+  "aiDocumentSummary": "<1-2 sentence summary of what this document is>",
+  "investor": {
+    "name": "<account holder name if found, else null>",
+    "accountNumber": "<masked account number if found, else null>",
+    "pan": "<PAN if found, else null>"
+  },
+  "investments": [
+    {
+      "name": "<investment/scheme/FD name>",
+      "type": "<Bank FD | Bond | Mutual Fund | Stock | ETF | Insurance | Post Office | Government Scheme | Other>",
+      "issuer": "<bank/institution name>",
+      "amount": 0,
+      "rate": 0,
+      "maturityDate": null,
+      "units": 0,
+      "buyPrice": 0,
+      "currentPrice": 0,
+      "purchaseDate": null,
+      "assetClass": "<equity|debt|gold|realestate|insurance|other>"
+    }
+  ],
+  "transactionSummary": {
+    "totalCredits": 0,
+    "totalDebits": 0,
+    "period": null
+  }
+}
+
+RULES: Return ONLY valid JSON. No markdown, no explanation. If a field is unknown use null or 0. Amount must be a number (rupees). Do NOT invent data not in the document.`;
+
+            const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: prompt }] }],
+                    generationConfig: {
+                        responseMimeType: 'application/json',
+                        temperature:       0.1,
+                        maxOutputTokens:   4096
+                    }
+                })
+            });
+
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => ({}));
+                const msg = errBody?.error?.message || `HTTP ${res.status}`;
+                if (res.status === 400) throw new Error(`Invalid API key or request: ${msg}`);
+                if (res.status === 403) throw new Error('API key lacks Gemini access. Check Google AI Studio → API Keys.');
+                if (res.status === 429) throw new Error('Gemini rate limit hit. Wait 60 seconds and try again.');
+                throw new Error(`Gemini API error: ${msg}`);
+            }
+
+            const data = await res.json();
+            const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!responseText) throw new Error('Gemini returned an empty response. Please retry.');
+
+            const clean = responseText
+                .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+
+            let parsed;
+            try { parsed = JSON.parse(clean); }
+            catch (e) { throw new Error('Could not parse Gemini response as JSON. Please retry.'); }
+
+            // Normalise: ensure all investment fields are correctly typed
+            if (parsed.investments) {
+                parsed.investments = parsed.investments.map((inv, i) => ({
+                    id:           `ai_${Date.now()}_${i}`,
+                    name:         inv.name         || 'Unnamed Holding',
+                    type:         inv.type         || 'Other',
+                    issuer:       inv.issuer        || '',
+                    amount:       Number(inv.amount) || 0,
+                    rate:         Number(inv.rate)   || 0,
+                    maturityDate: inv.maturityDate   || '',
+                    units:        Number(inv.units)  || 0,
+                    buyPrice:     Number(inv.buyPrice)     || 0,
+                    currentPrice: Number(inv.currentPrice) || 0,
+                    currentValue: (Number(inv.units) > 0 && Number(inv.currentPrice) > 0)
+                                    ? Number(inv.units) * Number(inv.currentPrice)
+                                    : Number(inv.amount) || 0,
+                    purchaseDate: inv.purchaseDate || '',
+                    assetClass:   inv.assetClass   || 'other',
+                    payout: 'Monthly', rating: '', ticker: '', schemeCode: ''
+                }));
+            }
+
+            return parsed;
         },
 
         async getPdfWorkerUrl() {
@@ -1755,6 +2064,112 @@ document.addEventListener('alpine:init', () => {
                 console.error('Error fetching live prices:', err);
                 this.navFetchState = 'error';
                 this.navFetchError = 'Failed to sync some prices. Please try again.';
+            }
+        },
+
+        // ════════════════════════════════════════════════════════════
+        //  PHASE 12: NATIVE MATURITY & SIP PAYMENT LOCAL NOTIFICATIONS
+        // ════════════════════════════════════════════════════════════
+
+        async scheduleMaturityAlerts() {
+            // Only run on native Android/iOS — LocalNotifications plugin not available in browser
+            const plugins = window.AppPlugins;
+            if (!plugins || !plugins.Capacitor?.isNativePlatform() || !plugins.LocalNotifications) {
+                this.alertsState = 'unsupported';
+                return;
+            }
+
+            this.alertsState = 'scheduling';
+            this.alertsError = '';
+
+            try {
+                const { LocalNotifications } = plugins;
+
+                // 1. Request permission — required on Android 13+ (API 33+)
+                const permResult = await LocalNotifications.requestPermissions();
+                this.notifPermissionGranted = (permResult.display === 'granted');
+                if (!this.notifPermissionGranted) {
+                    this.alertsState = 'error';
+                    this.alertsError = 'Notification permission denied. Enable in Android Settings → App Info → Notifications.';
+                    return;
+                }
+
+                // 2. Cancel ALL previously scheduled RFM notifications (clean slate)
+                const pending = await LocalNotifications.getPending();
+                if (pending.notifications && pending.notifications.length > 0) {
+                    await LocalNotifications.cancel({ notifications: pending.notifications });
+                }
+
+                const alerts = [];
+                const now = new Date();
+
+                // 3. Maturity Alerts — fire 7 days before each investment's maturityDate
+                (this.investments || []).forEach((inv, i) => {
+                    if (!inv.maturityDate) return;
+                    const matDate = new Date(inv.maturityDate);
+                    const alertAt = new Date(matDate);
+                    alertAt.setDate(alertAt.getDate() - 7);
+                    alertAt.setHours(9, 0, 0, 0); // 9:00 AM
+
+                    if (alertAt > now) {
+                        alerts.push({
+                            id:    10000 + i,
+                            title: '📅 Maturity Alert — RFM',
+                            body:  `${inv.name} of ${this.formatCurrency(inv.amount)} matures in 7 days (${this.formatDate(inv.maturityDate)}). Plan reinvestment now.`,
+                            schedule: { at: alertAt, allowWhileIdle: true },
+                            sound:    'default',
+                            smallIcon: 'ic_stat_notification',
+                            channelId: 'rfm_maturity'
+                        });
+                    }
+
+                    // Also schedule a same-day reminder at 9 AM on maturity date
+                    const sameDayAlert = new Date(matDate);
+                    sameDayAlert.setHours(9, 0, 0, 0);
+                    if (sameDayAlert > now) {
+                        alerts.push({
+                            id:    11000 + i,
+                            title: '🔔 Maturity Today — RFM',
+                            body:  `${inv.name} (${this.formatCurrency(inv.amount)}) matures TODAY. Contact ${inv.issuer || 'your bank'} to reinvest.`,
+                            schedule: { at: sameDayAlert, allowWhileIdle: true },
+                            sound:    'default',
+                            smallIcon: 'ic_stat_notification',
+                            channelId: 'rfm_maturity'
+                        });
+                    }
+                });
+
+                // 4. SIP Reminders — 1 day before debit day, for next 12 months
+                (this.activeSips || []).forEach((sip, i) => {
+                    const debitDay = Number(sip.dayOfMonth) || 5;
+                    for (let month = 0; month < 12; month++) {
+                        const reminderAt = new Date(now.getFullYear(), now.getMonth() + month, debitDay - 1, 9, 0, 0, 0);
+                        if (reminderAt > now) {
+                            alerts.push({
+                                id:    20000 + (i * 100) + month,
+                                title: '💰 SIP Reminder — RFM',
+                                body:  `₹${this.formatCurrency(sip.monthlyAmount)} for "${sip.name}" debits tomorrow (${debitDay}th). Ensure sufficient balance.`,
+                                schedule: { at: reminderAt, allowWhileIdle: true },
+                                sound:    'default',
+                                smallIcon: 'ic_stat_notification',
+                                channelId: 'rfm_sip'
+                            });
+                        }
+                    }
+                });
+
+                // 5. Schedule all built notifications in one batch call
+                if (alerts.length > 0) {
+                    await LocalNotifications.schedule({ notifications: alerts });
+                }
+
+                this.scheduledAlertsCount = alerts.length;
+                this.alertsState = 'scheduled';
+
+            } catch (err) {
+                console.error('[Phase 12] Failed to schedule notifications:', err);
+                this.alertsState = 'error';
+                this.alertsError = err.message || 'Unknown error scheduling notifications.';
             }
         },
 
