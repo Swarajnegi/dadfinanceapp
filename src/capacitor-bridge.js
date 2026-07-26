@@ -9,10 +9,10 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 // ── pdf.js for client-side PDF parsing (Phase 5) ──
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Use local worker script for 100% offline client-side PDF parsing
+// Use local .js worker script for 100% offline client-side PDF parsing in Capacitor Android
 try {
     if (pdfjsLib.GlobalWorkerOptions) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.mjs';
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.js';
     }
 } catch (e) {
     console.warn("Failed to set PDF workerSrc:", e);

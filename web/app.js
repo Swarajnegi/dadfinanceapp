@@ -1489,15 +1489,26 @@ document.addEventListener('alpine:init', () => {
                 throw new Error('PDF library not loaded. Please reload the app.');
             }
 
-            if (pdfjsLib.GlobalWorkerOptions && !pdfjsLib.GlobalWorkerOptions.workerSrc) {
-                pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.mjs';
+            if (pdfjsLib.GlobalWorkerOptions) {
+                pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.js';
             }
 
             const arrayBuffer = await file.arrayBuffer();
             const loadingConfig = { data: arrayBuffer };
             if (password) loadingConfig.password = password;
 
-            const pdf = await pdfjsLib.getDocument(loadingConfig).promise;
+            let pdf;
+            try {
+                pdf = await pdfjsLib.getDocument(loadingConfig).promise;
+            } catch (err) {
+                console.warn('Primary worker load exception, attempting fallback:', err);
+                if (pdfjsLib.GlobalWorkerOptions && (err.message && (err.message.includes('workerSrc') || err.message.includes('Worker')))) {
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+                    pdf = await pdfjsLib.getDocument(loadingConfig).promise;
+                } else {
+                    throw err;
+                }
+            }
 
             let fullText = '';
             for (let i = 1; i <= pdf.numPages; i++) {
