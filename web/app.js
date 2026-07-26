@@ -189,6 +189,12 @@ document.addEventListener('alpine:init', () => {
 
             // Lock on resume when returning from background
             App.addListener('appStateChange', ({ isActive }) => {
+                if (this.isSelectingFile) {
+                    if (isActive) {
+                        setTimeout(() => { this.isSelectingFile = false; }, 2000);
+                    }
+                    return;
+                }
                 if (!isActive) {
                     isAuthenticated = false;
                 } else if (isActive && !isAuthenticated && !isPrompting) {
@@ -1302,8 +1308,23 @@ document.addEventListener('alpine:init', () => {
         // ════════════════════════════════════════════════════════════
         //  ACTIONS — IMPORT (Phase 5)
         // ════════════════════════════════════════════════════════════
+        isSelectingFile: false,
+
+        handleFileUpload(event) {
+            this.isSelectingFile = false;
+            this.handleImportFile(event);
+        },
+
+        get pdfPassword() { return this.importPassword; },
+        set pdfPassword(val) { this.importPassword = val; },
+
+        async processStatement() {
+            return this.parseStatement();
+        },
+
         handleImportFile(event) {
-            const file = event.target.files[0];
+            this.isSelectingFile = false;
+            const file = event.target.files?.[0];
             if (file && file.type === 'application/pdf') {
                 this.importFile = file;
                 this.importError = '';
