@@ -1483,13 +1483,33 @@ document.addEventListener('alpine:init', () => {
             }
         },
 
+        async getPdfWorkerUrl() {
+            if (window._pdfWorkerBlobUrl) return window._pdfWorkerBlobUrl;
+
+            try {
+                const res = await fetch('pdf.worker.min.js');
+                if (res.ok) {
+                    const text = await res.text();
+                    const blob = new Blob([text], { type: 'text/javascript' });
+                    window._pdfWorkerBlobUrl = URL.createObjectURL(blob);
+                    return window._pdfWorkerBlobUrl;
+                }
+            } catch (e) {
+                console.warn('Failed to fetch local PDF worker script for blob creation:', e);
+            }
+            return 'pdf.worker.min.js';
+        },
+
         async extractPdfText(file, password) {
             const pdfjsLib = window.pdfjsLib;
             if (!pdfjsLib) {
                 throw new Error('PDF library not loaded. Please reload the app.');
             }
 
-            if (pdfjsLib.GlobalWorkerOptions) {
+            try {
+                const workerUrl = await this.getPdfWorkerUrl();
+                pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+            } catch (e) {
                 pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdf.worker.min.js';
             }
 
@@ -1502,8 +1522,11 @@ document.addEventListener('alpine:init', () => {
                 pdf = await pdfjsLib.getDocument(loadingConfig).promise;
             } catch (err) {
                 console.warn('Primary worker load exception, attempting fallback:', err);
-                if (pdfjsLib.GlobalWorkerOptions && (err.message && (err.message.includes('workerSrc') || err.message.includes('Worker')))) {
-                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+                if (err.name === 'PasswordException' || (err.message && err.message.toLowerCase().includes('password'))) {
+                    throw err;
+                }
+                if (pdfjsLib.GlobalWorkerOptions) {
+                    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://unpkg.com/pdfjs-dist@6.1.200/build/pdf.worker.min.mjs';
                     pdf = await pdfjsLib.getDocument(loadingConfig).promise;
                 } else {
                     throw err;
