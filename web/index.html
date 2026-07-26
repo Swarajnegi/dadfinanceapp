@@ -1800,10 +1800,89 @@ No financial goals added yet. Use the form above to add your first goal!
 <button @click="addingSip = false" class="absolute top-4 right-4 text-white/50 hover:text-white">✕</button>
 <h3 class="text-lg font-bold text-white mb-4">Add Recurring SIP / RD</h3>
 <form @submit.prevent="addSip()" class="space-y-4">
-<div>
-<label class="block text-xs font-medium text-white/70 mb-1">Plan Name</label>
-<input type="text" x-model="newSip.name" placeholder="e.g. Parag Parikh Flexi Cap SIP" required class="w-full px-3 py-2 bg-surface-container-lowest border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-primary">
+<div class="relative">
+<label class="block text-xs font-medium text-white/70 mb-1 flex items-center gap-1.5">
+    Plan Name
+    <span x-show="newSip.type === 'SIP' || newSip.type === 'PPF'" class="text-[10px] px-1.5 py-0.5 rounded bg-primary/15 text-primary border border-primary/25">
+        AMFI Search
+    </span>
+</label>
+
+<!-- Input with search icon -->
+<div class="relative">
+    <input
+        type="text"
+        x-model="newSip.name"
+        @input="searchSipMf()"
+        @focus="if(newSip.name.length >= 3) searchSipMf()"
+        @blur="closeSipDropdown()"
+        @keydown.escape="sipMfSearch.show = false"
+        placeholder="Type fund name e.g. Parag Parikh, HDFC Mid..."
+        required
+        class="w-full pl-9 pr-3 py-2.5 bg-surface-container-lowest border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-primary transition-colors"
+        :class="newSip.schemeCode ? 'border-primary/50' : ''"
+    >
+    <!-- Left icon: spinner when loading, search otherwise -->
+    <div class="absolute left-2.5 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none">
+        <template x-if="sipMfSearch.loading">
+            <span class="material-symbols-outlined text-[16px] text-primary animate-spin">sync</span>
+        </template>
+        <template x-if="!sipMfSearch.loading">
+            <span class="material-symbols-outlined text-[16px]">search</span>
+        </template>
+    </div>
 </div>
+
+<!-- Scheme code badge after selection -->
+<template x-if="newSip.schemeCode">
+    <div class="flex items-center gap-1.5 mt-1.5">
+        <span class="text-[11px] text-primary/70">AMFI Code:</span>
+        <span class="text-[11px] font-mono font-bold text-primary bg-primary/10 border border-primary/20 px-2 py-0.5 rounded" x-text="newSip.schemeCode"></span>
+        <button type="button" @click="newSip.schemeCode = ''" class="text-[11px] text-white/30 hover:text-white/60 ml-auto">✕ Clear</button>
+    </div>
+</template>
+
+<!-- Dropdown results -->
+<div x-show="sipMfSearch.show && sipMfSearch.results.length > 0"
+     x-transition:enter="transition ease-out duration-150"
+     x-transition:enter-start="opacity-0 -translate-y-1"
+     x-transition:enter-end="opacity-100 translate-y-0"
+     class="absolute left-0 right-0 top-full mt-1 z-50 bg-[#0d1c2d] border border-primary/25 rounded-xl shadow-[0_12px_32px_rgba(0,0,0,0.7)] overflow-hidden"
+     x-cloak>
+    <div class="px-3 py-2 border-b border-white/5 flex items-center gap-2">
+        <span class="material-symbols-outlined text-[14px] text-primary/60">auto_awesome</span>
+        <span class="text-[11px] text-white/40">Select from AMFI-registered mutual funds</span>
+    </div>
+    <div class="max-h-56 overflow-y-auto">
+        <template x-for="scheme in sipMfSearch.results" :key="scheme.schemeCode">
+            <button
+                type="button"
+                @mousedown.prevent="selectSipMf(scheme)"
+                class="w-full text-left px-3 py-2.5 hover:bg-primary/10 transition-colors border-b border-white/5 last:border-0 group"
+            >
+                <div class="flex items-start gap-2">
+                    <span class="material-symbols-outlined text-[14px] text-primary/50 mt-0.5 shrink-0 group-hover:text-primary transition-colors">savings</span>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs text-white leading-snug line-clamp-2" x-text="scheme.schemeName"></p>
+                        <p class="text-[10px] font-mono text-primary/60 mt-0.5" x-text="'Code: ' + scheme.schemeCode"></p>
+                    </div>
+                </div>
+            </button>
+        </template>
+    </div>
+    <div class="px-3 py-1.5 border-t border-white/5 text-center">
+        <span class="text-[10px] text-white/25">Data from AMFI India • No API key needed</span>
+    </div>
+</div>
+
+<!-- Empty state when searching returns nothing -->
+<div x-show="sipMfSearch.show && !sipMfSearch.loading && sipMfSearch.results.length === 0 && newSip.name.length >= 3"
+     class="absolute left-0 right-0 top-full mt-1 z-50 bg-[#0d1c2d] border border-white/10 rounded-xl py-3 px-4 shadow-xl"
+     x-cloak>
+    <p class="text-xs text-white/40 text-center">No matching funds. Try a different name.</p>
+</div>
+</div>
+
 <div class="grid grid-cols-2 gap-3">
 <div>
 <label class="block text-xs font-medium text-white/70 mb-1">Type</label>
@@ -1813,7 +1892,7 @@ No financial goals added yet. Use the form above to add your first goal!
 </div>
 <div>
 <label class="block text-xs font-medium text-white/70 mb-1">Monthly Amount (₹)</label>
-<input type="number" x-model="newSip.monthlyAmount" placeholder="5000" required min="1" class="w-full px-3 py-2 bg-surface-container-lowest border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-primary">
+<input id="sip-monthly-amount" type="number" x-model="newSip.monthlyAmount" placeholder="5000" required min="1" class="w-full px-3 py-2 bg-surface-container-lowest border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-primary">
 </div>
 </div>
 <div>

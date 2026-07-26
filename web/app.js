@@ -83,7 +83,17 @@ document.addEventListener('alpine:init', () => {
         newSip: {
             name: '', type: 'SIP', monthlyAmount: '',
             dayOfMonth: 5, startDate: '', endDate: '',
-            status: 'Active', linkedInvestmentId: null, ticker: ''
+            status: 'Active', linkedInvestmentId: null, ticker: '',
+            schemeCode: ''
+        },
+
+        // ── SIP Modal MF Autocomplete State ───────────────────────────────
+        sipMfSearch: {
+            query: '',
+            results: [],
+            loading: false,
+            show: false,
+            _timer: null
         },
 
         // ── Internal chart instances (not reactive state) ────────────
@@ -2352,9 +2362,72 @@ RULES: Return ONLY valid JSON. No markdown, no explanation. If a field is unknow
             this.newSip = {
                 name: '', type: 'SIP', monthlyAmount: '',
                 dayOfMonth: 5, startDate: '', endDate: '',
-                status: 'Active', linkedInvestmentId: null, ticker: ''
+                status: 'Active', linkedInvestmentId: null, ticker: '', schemeCode: ''
             };
+            // Reset autocomplete state
+            this.sipMfSearch = { query: '', results: [], loading: false, show: false, _timer: null };
             this.addingSip = false;
+        },
+
+        // ════════════════════════════════════════════════════════════
+        //  SIP MODAL: AMFI MUTUAL FUND TYPEAHEAD AUTOCOMPLETE
+        // ════════════════════════════════════════════════════════════
+
+        // Called on every keystroke in the SIP Plan Name field
+        async searchSipMf() {
+            const q = this.newSip.name.trim();
+
+            // Hide dropdown for short queries
+            if (q.length < 3 || this.newSip.type === 'RD' || this.newSip.type === 'EMI' || this.newSip.type === 'Other') {
+                this.sipMfSearch.results = [];
+                this.sipMfSearch.show = false;
+                return;
+            }
+
+            // Debounce: wait 350ms after user stops typing
+            clearTimeout(this.sipMfSearch._timer);
+            this.sipMfSearch._timer = setTimeout(async () => {
+                this.sipMfSearch.loading = true;
+                this.sipMfSearch.show = true;
+                try {
+                    const res = await fetch(`https://api.mfapi.in/mf/search?q=${encodeURIComponent(q)}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        // Top 7 results, sorted by closest name match
+                        this.sipMfSearch.results = (data || []).slice(0, 7);
+                    } else {
+                        this.sipMfSearch.results = [];
+                    }
+                } catch (e) {
+                    this.sipMfSearch.results = [];
+                } finally {
+                    this.sipMfSearch.loading = false;
+                }
+            }, 350);
+        },
+
+        // Called when user taps a dropdown result in the SIP modal
+        selectSipMf(scheme) {
+            this.newSip.name       = scheme.schemeName;
+            this.newSip.schemeCode = String(scheme.schemeCode);
+            // Auto-set type to SIP if it's a mutual fund
+            if (this.newSip.type !== 'SIP') this.newSip.type = 'SIP';
+            // Close dropdown
+            this.sipMfSearch.results = [];
+            this.sipMfSearch.show    = false;
+            // Focus the Monthly Amount field after selection
+            this.$nextTick(() => {
+                const el = document.getElementById('sip-monthly-amount');
+                if (el) el.focus();
+            });
+        },
+
+        closeSipDropdown() {
+            // Small delay to let click on result register before hiding
+            setTimeout(() => {
+                this.sipMfSearch.show = false;
+                this.sipMfSearch.results = [];
+            }, 180);
         },
 
         deleteSip(id) {
