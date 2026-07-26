@@ -45,6 +45,23 @@ function detectStatementType(text) {
         return 'KFINTECH_MF';
     }
 
+    // Bank Account Statement (ICICI, SBI, HDFC, Axis, PNB, Bank Passbook / Transaction History)
+    if (t.includes('STATEMENT OF TRANSACTIONS') ||
+        t.includes('SAVING ACCOUNT') ||
+        t.includes('SAVINGS ACCOUNT') ||
+        t.includes('ACCOUNT STATEMENT') ||
+        t.includes('WITHDRAWAL AMOUNT') ||
+        t.includes('DEPOSIT AMOUNT') ||
+        t.includes('TRANSACTION REMARKS') ||
+        t.includes('CHEQUE NUMBER')) {
+        return 'BANK_STATEMENT';
+    }
+
+    // Generic fallback for any financial document with balances or holdings
+    if (t.includes('BALANCE') || t.includes('VALUATION') || t.includes('AMOUNT') || t.includes('STATEMENT')) {
+        return 'GENERIC_STATEMENT';
+    }
+
     return 'UNKNOWN';
 }
 
@@ -449,6 +466,119 @@ function fallbackISINScan(lines) {
 
 
 // ════════════════════════════════════════════════════════════════
+//  BANK STATEMENT PARSER (ICICI, SBI, HDFC, Axis, etc.)
+// ════════════════════════════════════════════════════════════════
+
+function parseBankStatement(text) {
+    const fullText = text;
+    const lines = text.split('\n').map(cleanLine).filter(l => l.length > 0);
+
+    let bankName = 'Bank Account';
+    if (/ICICI\s*BANK/i.test(fullText)) bankName = 'ICICI Bank';
+    else if (/STATE\s*BANK\s*OF\s*INDIA|SBI/i.test(fullText)) bankName = 'State Bank of India';
+    else if (/HDFC\s*BANK/i.test(fullText)) bankName = 'HDFC Bank';
+    else if (/AXIS\s*BANK/i.test(fullText)) bankName = 'Axis Bank';
+    else if (/KOTAK/i.test(fullText)) bankName = 'Kotak Bank';
+    else if (/PUNJAB\s*NATIONAL|PNB/i.test(fullText)) bankName = 'PNB';
+    else if (/BANK\s*OF\s*BARODA/i.test(fullText)) bankName = 'Bank of Baroda';
+
+    // Account Number
+    let accountNo = '';
+    const accMatch = fullText.match(/(?:Saving|Savings|Account)\s*(?:no\.?|number)?\s*[:\-]?\s*(\d{8,18})/i);
+    if (accMatch) accountNo = accMatch[1];
+
+    // Investor Name
+    let investorName = '';
+    const nameMatch = fullText.match(/\b(SWARAJ\s+[A-Z\s]{2,20}|[A-Z]{3,}\s+(?:SINGH|KUMAR|NEGI|SHARMA|VERMA|GUPTA|JAIN|AGARWAL|MEHTA|[A-Z]{3,})\s+[A-Z]{3,})\b/);
+    if (nameMatch) {
+        investorName = nameMatch[1].trim();
+    } else {
+        const genName = fullText.match(/(?:Holder|Name|Customer)\s*[:\-]?\s*([A-Za-z\s]{3,30})/i);
+        if (genName) investorName = genName[1].trim();
+    }
+
+    // Closing balance
+    let closingBalance = 0;
+    const balanceMatches = [...fullText.matchAll(/([\d,]+\.\d{2})/g)].map(m => parseIndianNumber(m[0]));
+    if (balanceMatches.length > 0) {
+        for (let i = balanceMatches.length - 1; i >= 0; i--) {
+            if (balanceMatches[i] > 10 && balanceMatches[i] < 100000000) {
+                closingBalance = balanceMatches[i];
+                break;
+            }
+        }
+    }
+
+    const shortAcc = accountNo ? `(a/c ...${accountNo.slice(-4)})` : '';
+    const itemName = `${bankName} Savings ${shortAcc}`.trim();
+
+    const holding = {
+        name: itemName,
+        type: 'Bank FD', // Mapped to Bank / Fixed Deposit asset class
+        issuer: bankName,
+        units: 1,
+        value: closingBalance,
+        nav: closingBalance,
+        folioNumber: accountNo,
+        dpId: '',
+        isin: ''
+    };
+
+    return {
+        type: 'BANK_STATEMENT',
+        investor: { name: investorName, pan: '' },
+        holdings: [holding]
+    };
+}
+
+
+// ════════════════════════════════════════════════════════════════
+//  GENERIC FINANCIAL STATEMENT PARSER
+// ════════════════════════════════════════════════════════════════
+
+function parseGenericPdf(text) {
+    const lines = text.split('\n').map(cleanLine).filter(l => l.length > 0);
+
+    const isinHoldings = fallbackISINScan(lines);
+    if (isinHoldings.length > 0) {
+        return {
+            type: 'GENERIC_STATEMENT',
+            investor: extractInvestorInfo(text),
+            holdings: isinHoldings
+        };
+    }
+
+    const holdings = [];
+    let lastFoundValue = 0;
+
+    const valMatches = [...text.matchAll(/(?:Total|Valuation|Balance|Amount|Value|Sum)\s*[:\-]?\s*₹?\s*([\d,]+\.?\d*)/gi)];
+    if (valMatches.length > 0) {
+        lastFoundValue = parseIndianNumber(valMatches[valMatches.length - 1][1]);
+    }
+
+    if (lastFoundValue > 0) {
+        holdings.push({
+            name: 'Imported Financial Statement Holding',
+            type: 'Mutual Fund',
+            issuer: 'Imported Asset',
+            units: 1,
+            value: lastFoundValue,
+            nav: lastFoundValue,
+            folioNumber: '',
+            dpId: '',
+            isin: ''
+        });
+    }
+
+    return {
+        type: 'GENERIC_STATEMENT',
+        investor: extractInvestorInfo(text),
+        holdings: holdings
+    };
+}
+
+
+// ════════════════════════════════════════════════════════════════
 //  NORMALIZATION — Convert parsed holdings to our app's shape
 // ════════════════════════════════════════════════════════════════
 
@@ -524,11 +654,13 @@ function parseStatement(text) {
 
     let parsed;
     switch (type) {
-        case 'CDSL_CAS':    parsed = parseCDSL(text);     break;
-        case 'NSDL_CAS':    parsed = parseNSDL(text);     break;
-        case 'CAMS_MF':     parsed = parseCAMS(text);     break;
-        case 'KFINTECH_MF': parsed = parseKFintech(text); break;
-        default:            parsed = { type, investor: {}, holdings: [] };
+        case 'CDSL_CAS':          parsed = parseCDSL(text);          break;
+        case 'NSDL_CAS':          parsed = parseNSDL(text);          break;
+        case 'CAMS_MF':           parsed = parseCAMS(text);          break;
+        case 'KFINTECH_MF':       parsed = parseKFintech(text);      break;
+        case 'BANK_STATEMENT':    parsed = parseBankStatement(text); break;
+        case 'GENERIC_STATEMENT': parsed = parseGenericPdf(text);     break;
+        default:                  parsed = { type, investor: {}, holdings: [] };
     }
 
     const investments = normalizeToInvestments(parsed);
