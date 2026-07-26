@@ -47,7 +47,8 @@ document.addEventListener('alpine:init', () => {
             homeLoanInterest: 0,    // Section 24 interest deduction (max ₹2L)
             otherDeductions:  0,    // Any other eligible deductions
             regime:          'compare', // 'old' | 'new' | 'compare'
-            seniorCitizen:    true   // Age 60+ — different slabs & deductions apply
+            seniorCitizen:    true,  // Age 60+ — different slabs & deductions apply
+            capitalGainsOverride: null // Manual override for total capital gains tax
         },
 
         goals: [],
@@ -72,7 +73,8 @@ document.addEventListener('alpine:init', () => {
         newInv: {
             name: '', type: 'Stock', issuer: '', amount: '',
             rate: '', payout: 'Monthly', rating: '', maturityDate: '',
-            ticker: '', units: '', buyPrice: '', currentPrice: ''
+            ticker: '', units: '', buyPrice: '', currentPrice: '',
+            purchaseDate: '', assetClass: 'equity'
         },
         newGoal: {
             name: '', type: 'Emergency Fund',
@@ -523,10 +525,96 @@ document.addEventListener('alpine:init', () => {
         },
 
         get totalInterestIncome() { return this.annualInterestIncome; },
-        get totalTds() { return 0; }, // Placeholder for actual TDS
+        
+        // ── CAPITAL GAINS ENGINE (Phase 6) ───────────────────────────
+        // FY 2024-25 Rules:
+        // - Equity LTCG (>12m): 12.5% tax on gains exceeding ₹1.25L exemption
+        // - Equity STCG (≤12m): 20% tax on full gains
+        // - Debt LTCG/STCG: Taxed at slab rate
+        get equityLTCG() {
+            let totalGains = 0;
+            const today = new Date();
+
+            (this.investments || []).forEach(inv => {
+                const isEquity = ['Stock', 'Mutual Fund', 'ETF'].includes(inv.type) || inv.assetClass === 'equity';
+                if (!isEquity) return;
+
+                let isLongTerm = true;
+                if (inv.purchaseDate) {
+                    const buyDate = new Date(inv.purchaseDate);
+                    const days = (today - buyDate) / (1000 * 60 * 60 * 24);
+                    isLongTerm = days > 365;
+                }
+
+                if (isLongTerm) {
+                    const buyCost = (Number(inv.buyPrice) * Number(inv.units)) || Number(inv.amount);
+                    const currentVal = Number(inv.currentValue) || Number(inv.amount);
+                    const gain = Math.max(0, currentVal - buyCost);
+                    totalGains += gain;
+                }
+            });
+
+            const exemptionLimit = 125000;
+            const exemptionUsed = Math.min(totalGains, exemptionLimit);
+            const taxableGains = Math.max(0, totalGains - exemptionLimit);
+            const tax = Math.round(taxableGains * 0.125 * 1.04); // 12.5% + 4% cess
+
+            return { totalGains, exemptionUsed, taxableGains, tax };
+        },
+
+        get equitySTCG() {
+            let totalGains = 0;
+            const today = new Date();
+
+            (this.investments || []).forEach(inv => {
+                const isEquity = ['Stock', 'Mutual Fund', 'ETF'].includes(inv.type) || inv.assetClass === 'equity';
+                if (!isEquity) return;
+
+                let isShortTerm = false;
+                if (inv.purchaseDate) {
+                    const buyDate = new Date(inv.purchaseDate);
+                    const days = (today - buyDate) / (1000 * 60 * 60 * 24);
+                    isShortTerm = days <= 365;
+                }
+
+                if (isShortTerm) {
+                    const buyCost = (Number(inv.buyPrice) * Number(inv.units)) || Number(inv.amount);
+                    const currentVal = Number(inv.currentValue) || Number(inv.amount);
+                    const gain = Math.max(0, currentVal - buyCost);
+                    totalGains += gain;
+                }
+            });
+
+            const tax = Math.round(totalGains * 0.20 * 1.04); // 20% + 4% cess
+
+            return { totalGains, tax };
+        },
+
+        get debtCapitalGains() {
+            let totalGains = 0;
+            (this.investments || []).forEach(inv => {
+                const isDebt = ['Bank FD', 'Bond', 'RBI Bond', 'Post Office', 'Government Scheme'].includes(inv.type) || inv.assetClass === 'debt';
+                if (!isDebt) return;
+                const buyCost = Number(inv.amount);
+                const currentVal = Number(inv.currentValue) || Number(inv.amount);
+                const gain = Math.max(0, currentVal - buyCost);
+                totalGains += gain;
+            });
+            return { totalGains };
+        },
+
+        get totalCapitalGainsTax() {
+            if (this.tax.capitalGainsOverride !== null && this.tax.capitalGainsOverride !== undefined && this.tax.capitalGainsOverride !== '') {
+                return Number(this.tax.capitalGainsOverride);
+            }
+            return (this.equityLTCG?.tax || 0) + (this.equitySTCG?.tax || 0);
+        },
+
+        get totalTds() { return 0; },
+
         get netTaxPayable() {
-            const tax = Math.min(this.oldRegimeTax.tax, this.newRegimeTax.tax);
-            return Math.max(0, tax - this.totalTds);
+            const incomeTax = Math.min(this.oldRegimeTax.tax, this.newRegimeTax.tax);
+            return Math.max(0, incomeTax + this.totalCapitalGainsTax - this.totalTds);
         },
 
         // ── OLD REGIME CALCULATION ───────────────────────────────────
@@ -672,17 +760,14 @@ document.addEventListener('alpine:init', () => {
             ];
         },
 
-        // ── ITR FORM SELECTOR ────────────────────────────────────────
         get itrFormRecommendation() {
-            const hasCapGains     = false; // Phase 6+ — broker integration
-            const hasForeignAssets = false; // Phase 6+ — INDstocks
+            const hasCapGains     = (this.equityLTCG?.totalGains > 0 || this.equitySTCG?.totalGains > 0 || this.totalCapitalGainsTax > 0);
+            const hasForeignAssets = false;
             const hasBusiness     = Number(this.cashflow.project) > 0;
             const income          = this.grossAnnualIncome;
 
-            if (hasForeignAssets) return 'ITR-2';
-            if (hasCapGains)      return 'ITR-2';
-            if (hasBusiness)      return 'ITR-3';
-            // ITR-1 (Sahaj): Salary/Pension + one house property + other sources ≤ ₹50L total
+            if (hasForeignAssets || hasCapGains) return 'ITR-2';
+            if (hasBusiness) return 'ITR-3';
             if (income <= 5000000) return 'ITR-1';
             return 'ITR-2';
         },
