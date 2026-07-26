@@ -89,7 +89,7 @@ sips: []            // { id, name, type, monthlyAmount, dayOfMonth, startDate, e
 
 ---
 
-## 5. COMPLETED PHASES (DO NOT REBUILD)
+## 5. COMPLETED PHASES
 
 | Phase | What It Does | Key Files |
 |---|---|---|
@@ -97,11 +97,14 @@ sips: []            // { id, name, type, monthlyAmount, dayOfMonth, startDate, e
 | 2 | Pension single-source-of-truth (`pension.monthlyAmount` drives cash flow) | `app.js` L494–498 |
 | 3 | Senior citizen tax engine (Old vs New 2024-25 regime) + ITR Checklist | `app.js` L500–735 |
 | 4 | Capacitor 8 mobile: Android build, biometrics, status bar | `app.js` L138–197, `src/capacitor-bridge.js` |
-| 5 | PDF parser for CAMS/KFintech CAS + bank statements | `parser.js`, `app.js` L1171–1361 |
+| 5 | PDF parser for CAMS/KFintech CAS + ICICI/SBI/HDFC bank statements (Blob URL Worker) | `parser.js`, `app.js` |
+| 6 | Capital Gains (LTCG / STCG) Tax Calculator (FY 2024-25 12.5% LTCG / 20% STCG) | `app.js`, `index.html` |
 | 7 | JSON backup export & restore | `app.js` L1477–1525 |
 | 8 | Dynamic equity valuation engine (P&L helpers) | `app.js` L353–381 |
-| 9 | SIP, RD & recurring cash flow auto-scheduler | `app.js` L54–84, L320–351, L1528–1592 |
-| 10a | Stitch 3D Dark theme for Dashboard, Investments, Import, Tax screens | `index.html` (current 672 lines) |
+| 9 | SIP, RD & recurring cash flow auto-scheduler | `app.js` L54–84, L320–351 |
+| 10a | Stitch 3D Dark theme for Dashboard, Investments, Import, Tax screens | `index.html` |
+| 10b | Stitch 3D Dark theme for More Hub, Cash Flow, Net Worth, Pension, Emergency, Goals, Maturity | `index.html` |
+| Feature | Regenerative Wealth Engine (Live RSS News + Gemini 2.0 Flash AI Rebalancing) | `regenWealth.js`, `index.html` |
 
 ---
 
@@ -109,9 +112,25 @@ sips: []            // { id, name, type, monthlyAmount, dayOfMonth, startDate, e
 
 ---
 
-### PHASE 6: Capital Gains (LTCG / STCG) Tax Calculator
+### PHASE 11: Live NAV & Stock Price Ingestion
 
-**Scope**: Automatically calculate Long-Term and Short-Term Capital Gains tax on equity and mutual fund investments based on Indian FY 2024-25 rules, and surface them in the Tax Summary screen.
+**Scope**: Fetch real-time Indian Mutual Fund NAVs from the AMFI API and stock prices from a free source, then auto-update `currentPrice` on investments.
+
+#### API Sources
+1. **Mutual Fund NAVs (Free, no API key)**: `https://api.mfapi.in/mf/{schemeCode}`
+2. **Stock Prices**: `https://priceapi.moneycontrol.com/pricefeed/nse/equitycash/{symbol}`
+
+---
+
+### PHASE 12: Native Maturity & SIP Payment Local Notifications
+
+**Scope**: Use `@capacitor/local-notifications` to schedule native Android push notifications for upcoming FD/Bond maturities (7 days prior) and monthly SIP payment reminders (1 day prior).
+
+---
+
+### PHASE 13: Universal AI Statement Classifier (Gemini 2.0 Flash)
+
+**Scope**: Integrate Gemini 2.0 Flash for zero-shot transaction classification across Bank Statements, Credit Card statements, Insurance Policies, and Broker P&L statements.
 
 #### Tax Rules to Implement
 
