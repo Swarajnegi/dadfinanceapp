@@ -1,0 +1,1163 @@
+<!doctype html>
+<html lang="en">
+<head>
+
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>RFM Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=Outfit:wght@600;700&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-container": "#004e40",
+                        "outline": "#85948e",
+                        "tertiary-fixed-dim": "#bac8dc",
+                        "on-secondary": "#233143",
+                        "surface": "#051424",
+                        "secondary": "#b8c8de",
+                        "primary-fixed-dim": "#38debb",
+                        "surface-dim": "#051424",
+                        "on-surface": "#ffffff",
+                        "on-tertiary": "#243141",
+                        "inverse-surface": "#d4e4fa",
+                        "surface-variant": "#273647",
+                        "background": "#051424",
+                        "surface-container": "#122131",
+                        "outline-variant": "#3c4a45",
+                        "primary-fixed": "#5ffbd6",
+                        "error": "#ffb4ab",
+                        "inverse-on-surface": "#233143",
+                        "secondary-container": "#3e4d5f",
+                        "primary-container": "#00c9a7",
+                        "on-error": "#690005",
+                        "surface-tint": "#38debb",
+                        "tertiary-fixed": "#d6e4f9",
+                        "on-secondary-fixed-variant": "#39485a",
+                        "on-tertiary-fixed": "#0f1c2c",
+                        "on-primary-fixed-variant": "#005142",
+                        "surface-container-low": "#0d1c2d",
+                        "surface-container-high": "#1c2b3c",
+                        "on-primary-fixed": "#002019",
+                        "surface-container-lowest": "#010f1f",
+                        "tertiary": "#c0cee3",
+                        "error-container": "#93000a",
+                        "surface-container-highest": "#273647",
+                        "on-background": "#ffffff",
+                        "on-tertiary-container": "#384556",
+                        "secondary-fixed": "#d4e4fb",
+                        "inverse-primary": "#006b58",
+                        "on-tertiary-fixed-variant": "#3a4859",
+                        "secondary-fixed-dim": "#b8c8de",
+                        "on-error-container": "#ffdad6",
+                        "on-primary": "#00382d",
+                        "primary": "#44e5c2",
+                        "tertiary-container": "#a5b3c7",
+                        "on-secondary-fixed": "#0d1d2d",
+                        "on-secondary-container": "#aebdd3",
+                        "on-surface-variant": "#bacac3",
+                        "surface-bright": "#2c3a4c"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "container-padding-desktop": "40px",
+                        "container-padding-mobile": "20px",
+                        "card-gap": "16px",
+                        "gutter": "24px",
+                        "unit": "8px"
+                    },
+                    "fontFamily": {
+                        "body-md": ["Inter"],
+                        "display-currency-mobile": ["Outfit"],
+                        "display-currency": ["Outfit"],
+                        "headline-lg": ["Outfit"],
+                        "headline-md": ["Outfit"],
+                        "body-lg": ["Inter"],
+                        "label-caps": ["Inter"]
+                    },
+                    "fontSize": {
+                        "body-md": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "display-currency-mobile": ["32px", { "lineHeight": "40px", "letterSpacing": "-0.01em", "fontWeight": "700" }],
+                        "display-currency": ["48px", { "lineHeight": "56px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "headline-lg": ["32px", { "lineHeight": "40px", "fontWeight": "600" }],
+                        "headline-md": ["24px", { "lineHeight": "32px", "fontWeight": "600" }],
+                        "body-lg": ["18px", { "lineHeight": "28px", "fontWeight": "400" }],
+                        "label-caps": ["12px", { "lineHeight": "16px", "letterSpacing": "0.05em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .pb-safe {
+            padding-bottom: env(safe-area-inset-bottom, 20px);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+
+<!-- Chart.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+    <!-- Capacitor Plugins -->
+    <script defer src="plugins.js"></script>
+
+    <!-- Statement Parser (Phase 5) -->
+    <script defer src="parser.js"></script>
+
+    <!-- App Logic (must load before Alpine) -->
+    <script defer src="app.js"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+
+    <link rel="stylesheet" href="styles.css">
+
+</head>
+<body class="bg-background text-on-background min-h-screen pb-32 font-body-md text-body-md antialiased selection:bg-primary-container selection:text-on-primary-container bg-[#051424]" x-data="appData" x-cloak>
+
+<header class="fixed top-4 left-4 right-4 rounded-xl bg-gradient-to-br from-[#122131] to-[#0d1c2d] border border-white/5 shadow-[0_4px_12px_rgba(0,0,0,0.15),0_20px_40px_rgba(0,0,0,0.4)] flex justify-between items-center px-4 h-16 max-w-7xl mx-auto z-50 transition-all duration-200">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 rounded-full overflow-hidden border-2 border-surface-container-highest flex-shrink-0 bg-surface-variant">
+<img class="w-full h-full object-cover" data-alt="Close-up portrait of an Indian retiree, dignified and calm, softly lit against a dark, premium financial app background, highly detailed 8k resolution photograph." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBMJIlAACdprmq72E0NRPufYGKBgoBJQMllFWWxul7gq0e57J1q5OwcaPRGnNDtkvAheVDpLF3Gp7Xd1QGLHQfTGweljDZLSQJP5FsKdjxl7GzIEVOB2tD7UO8D_7l6teddd0jR6UVrIOXzPv7qzZ4mkvZF2--qY7zhpIz3fLOjy-D8hMWvv28HD_BE1yd_gYwiZxUbtnLM0zkxmGfnI_Czz2AjmjJd511Ndx7X5EqZpUGOPGFGgyQF8cq3tjO-zUgL0CbkYg1TL17l">
+</div>
+<span class="font-headline-md text-headline-md-mobile md:text-headline-md text-headline-md text-on-surface tracking-tight text-on-background">RFM</span>
+</div>
+<button class="w-10 h-10 rounded-full flex items-center justify-center text-on-surface hover:text-[#d4af37] hover:-translate-y-1.5 hover:shadow-[0_8px_16px_rgba(212,175,55,0.2)] transition-all active:translate-y-0 duration-200 bg-surface-container-high shadow-inner">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">notifications</span>
+</button>
+</header>
+
+<main x-show="activePage === 'home'" class="pt-28 px-container-padding-mobile md:px-container-padding-desktop max-w-7xl mx-auto flex flex-col gap-8">
+<!-- Net Worth Hero Card (Level 1 Elevation) -->
+<section class="bg-gradient-to-br from-[#122131] to-[#0d1c2d] border border-white/5 rounded-2xl p-6 shadow-[0_4px_12px_rgba(0,0,0,0.15),0_20px_40px_rgba(0,0,0,0.4)] hover:shadow-[0_16px_32px_rgba(0,0,0,0.3),0_40px_80px_rgba(0,0,0,0.7)] flex flex-col gap-4 relative overflow-hidden group hover:-translate-y-3 active:translate-y-0 active:shadow-[0_4px_12px_rgba(0,0,0,0.15),0_10px_20px_rgba(0,0,0,0.4)] transition-all duration-200 cursor-pointer shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
+<div class="absolute -right-16 -top-16 w-48 h-48 bg-primary rounded-full blur-[100px] opacity-10 group-hover:opacity-20 transition-opacity duration-200"></div>
+<div class="flex justify-between items-start z-10">
+<div class="flex flex-col gap-1">
+<h2 class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-widest">Total Net Worth</h2>
+<div class="font-display-currency-mobile text-display-currency-mobile md:font-display-currency md:text-display-currency text-on-surface">
+                        <span x-text="formatCurrency(netWorthTotal)"></span>
+                    </div>
+</div>
+<div class="bg-surface-container-highest px-3 py-1 rounded-full flex items-center gap-1 border border-primary/20 shadow-[0_0_10px_rgba(0,201,167,0.1)]">
+<span class="material-symbols-outlined text-[16px] text-primary" style="font-variation-settings: 'FILL' 1;">trending_up</span>
+<span class="font-label-caps text-label-caps text-primary">+0.45%</span>
+</div>
+</div>
+<div class="w-full h-[200px] bg-surface-container-low rounded-xl border border-surface-container-highest overflow-hidden relative mt-2 z-10 flex items-end">
+<!-- Placeholder for chart -->
+<div class="w-full h-full absolute inset-0 opacity-30 flex items-end">
+<svg class="w-full h-full text-primary" preserveAspectRatio="none" viewBox="0 0 400 150">
+<path d="M0,150 L0,120 Q50,130 100,100 T200,80 T300,50 T400,20 L400,150 Z" fill="currentColor" opacity="0.2"></path>
+<path d="M0,120 Q50,130 100,100 T200,80 T300,50 T400,20" fill="none" stroke="currentColor" stroke-width="2"></path>
+</svg>
+</div>
+<div class="w-full h-8 flex justify-between items-center px-4 font-label-caps text-label-caps text-on-surface-variant/50 border-t border-surface-container-highest bg-surface-container/50 backdrop-blur-sm z-20">
+<span class="">1D</span>
+<span class="text-primary font-bold">1M</span>
+<span class="">3M</span>
+<span class="">1Y</span>
+<span class="">ALL</span>
+</div>
+</div>
+</section>
+<!-- Asset Categories (Horizontal Scroll) -->
+<section class="flex flex-col gap-4">
+<h3 class="font-headline-md text-headline-md-mobile text-on-surface px-1">Assets</h3>
+<div class="flex overflow-x-auto gap-4 pb-6 hide-scrollbar -mx-container-padding-mobile px-container-padding-mobile md:-mx-0 md:px-0">
+<!-- FD Card -->
+<div class="min-w-[140px] bg-gradient-to-br from-[#122131] to-[#0d1c2d] border border-white/5 rounded-xl p-4 shadow-[0_4px_12px_rgba(0,0,0,0.15),0_20px_40px_rgba(0,0,0,0.4)] hover:shadow-[0_16px_32px_rgba(0,0,0,0.3),0_40px_80px_rgba(0,0,0,0.7)] flex flex-col gap-3 flex-shrink-0 hover:-translate-y-3 active:translate-y-0 active:shadow-[0_4px_12px_rgba(0,0,0,0.15),0_10px_20px_rgba(0,0,0,0.4)] transition-all duration-200 cursor-pointer hover:border-[#d4af37]/30">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">account_balance</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Fixed Deposits</span>
+<span class="font-body-lg text-body-lg font-semibold text-on-surface mt-1"><span x-text="formatCurrency(getAssetTotal('Bank FD'))"></span></span>
+</div>
+</div>
+<!-- Bonds Card -->
+<div class="min-w-[140px] bg-gradient-to-br from-[#122131] to-[#0d1c2d] border border-white/5 rounded-xl p-4 shadow-[0_4px_12px_rgba(0,0,0,0.15),0_20px_40px_rgba(0,0,0,0.4)] hover:shadow-[0_16px_32px_rgba(0,0,0,0.3),0_40px_80px_rgba(0,0,0,0.7)] flex flex-col gap-3 flex-shrink-0 hover:-translate-y-3 active:translate-y-0 active:shadow-[0_4px_12px_rgba(0,0,0,0.15),0_10px_20px_rgba(0,0,0,0.4)] transition-all duration-200 cursor-pointer hover:border-[#d4af37]/30">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">description</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Bonds</span>
+<span class="font-body-lg text-body-lg font-semibold text-on-surface mt-1"><span x-text="formatCurrency(getAssetTotal('Bond') + getAssetTotal('RBI Bond'))"></span></span>
+</div>
+</div>
+<!-- MF Card -->
+<div class="min-w-[140px] bg-gradient-to-br from-[#122131] to-[#0d1c2d] border border-white/5 rounded-xl p-4 shadow-[0_4px_12px_rgba(0,0,0,0.15),0_20px_40px_rgba(0,0,0,0.4)] hover:shadow-[0_16px_32px_rgba(0,0,0,0.3),0_40px_80px_rgba(0,0,0,0.7)] flex flex-col gap-3 flex-shrink-0 hover:-translate-y-3 active:translate-y-0 active:shadow-[0_4px_12px_rgba(0,0,0,0.15),0_10px_20px_rgba(0,0,0,0.4)] transition-all duration-200 cursor-pointer border-[#d4af37]/50 shadow-[0_0_15px_rgba(212,175,55,0.15),0_4px_12px_rgba(0,0,0,0.15),0_20px_40px_rgba(0,0,0,0.4)]">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center text-[#d4af37]">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">pie_chart</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Mutual Funds</span>
+<span class="font-body-lg text-body-lg font-semibold text-on-surface mt-1"><span x-text="formatCurrency(getAssetTotal('Mutual Fund'))"></span></span>
+</div>
+</div>
+<!-- Stocks Card -->
+<div class="min-w-[140px] bg-gradient-to-br from-[#122131] to-[#0d1c2d] border border-white/5 rounded-xl p-4 shadow-[0_4px_12px_rgba(0,0,0,0.15),0_20px_40px_rgba(0,0,0,0.4)] hover:shadow-[0_16px_32px_rgba(0,0,0,0.3),0_40px_80px_rgba(0,0,0,0.7)] flex flex-col gap-3 flex-shrink-0 hover:-translate-y-3 active:translate-y-0 active:shadow-[0_4px_12px_rgba(0,0,0,0.15),0_10px_20px_rgba(0,0,0,0.4)] transition-all duration-200 cursor-pointer hover:border-[#d4af37]/30">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center text-on-surface">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">show_chart</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Stocks</span>
+<span class="font-body-lg text-body-lg font-semibold text-on-surface mt-1"><span x-text="formatCurrency(getAssetTotal('Stock'))"></span></span>
+</div>
+</div>
+<!-- Gold Card -->
+<div class="min-w-[140px] bg-gradient-to-br from-[#122131] to-[#0d1c2d] border border-white/5 rounded-xl p-4 shadow-[0_4px_12px_rgba(0,0,0,0.15),0_20px_40px_rgba(0,0,0,0.4)] hover:shadow-[0_16px_32px_rgba(0,0,0,0.3),0_40px_80px_rgba(0,0,0,0.7)] flex flex-col gap-3 flex-shrink-0 hover:-translate-y-3 active:translate-y-0 active:shadow-[0_4px_12px_rgba(0,0,0,0.15),0_10px_20px_rgba(0,0,0,0.4)] transition-all duration-200 cursor-pointer hover:border-[#d4af37]/30">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center text-[#d4af37]">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">diamond</span>
+</div>
+<div class="flex flex-col">
+<span class="font-label-caps text-label-caps text-on-surface-variant">Gold</span>
+<span class="font-body-lg text-body-lg font-semibold text-on-surface mt-1"><span x-text="formatCurrency(getAssetTotal('Gold'))"></span></span>
+</div>
+</div>
+</div>
+</section>
+<!-- Monthly Income Section -->
+<section class="bg-gradient-to-br from-[#122131] to-[#0d1c2d] border border-white/5 rounded-2xl p-6 shadow-[0_4px_12px_rgba(0,0,0,0.15),0_20px_40px_rgba(0,0,0,0.4)] hover:shadow-[0_16px_32px_rgba(0,0,0,0.3),0_40px_80px_rgba(0,0,0,0.7)] flex flex-col gap-4 relative overflow-hidden group hover:-translate-y-3 active:translate-y-0 active:shadow-[0_4px_12px_rgba(0,0,0,0.15),0_10px_20px_rgba(0,0,0,0.4)] transition-all duration-200 cursor-pointer shadow-[0_20px_50px_rgba(0,0,0,0.6)]">
+<div class="absolute left-0 top-0 w-2 h-full bg-[#d4af37] rounded-l-2xl shadow-[0_0_15px_rgba(212,175,55,0.5)]"></div>
+<div class="flex justify-between items-center ml-2">
+<div class="flex items-center gap-3">
+<div class="w-12 h-12 rounded-xl bg-surface-container-highest flex items-center justify-center text-[#d4af37] shadow-inner">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">payments</span>
+</div>
+<div class="flex flex-col">
+<h3 class="font-body-lg text-body-lg font-semibold text-on-surface">Est. Monthly Income</h3>
+<span class="font-label-caps text-label-caps text-on-surface-variant">From Dividends &amp; Interest</span>
+</div>
+</div>
+<div class="font-headline-md text-headline-md-mobile text-[#d4af37] tracking-tight font-bold">
+                     <span x-text="formatCurrency(monthlyInvestmentIncome)"></span>
+                 </div>
+</div>
+<!-- Progress Bar -->
+<div class="ml-2 mt-2">
+<div class="flex justify-between font-label-caps text-label-caps text-on-surface-variant mb-2">
+<span class="">Current Yield</span>
+<span class="">Target: <span x-text="formatCurrency(monthlyInvestmentIncome * 1.25)"></span></span>
+</div>
+<div class="w-full h-2 bg-surface-container-lowest rounded-full overflow-hidden shadow-inner">
+<div class="h-full bg-[#d4af37] w-[80%] rounded-full shadow-[0_0_10px_rgba(212,175,55,0.8)]"></div>
+</div>
+</div>
+</section>
+</main>
+
+<main x-show="activePage === 'investments'" x-cloak class="pt-[104px] px-container-padding-mobile md:px-container-padding-desktop max-w-3xl mx-auto flex flex-col gap-[32px]">
+<!-- Page Header -->
+<section class="flex flex-col gap-unit">
+<h2 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-background">Portfolio Overview</h2>
+<div class="bg-gradient-to-br from-[#1c2b3c] to-[#0d1b2a] p-[24px] rounded-xl cursor-pointer lift-card shadow-[0_12px_24px_rgba(0,0,0,0.5),0_4px_12px_rgba(0,0,0,0.2)] border border-white/5 relative overflow-hidden group">
+<span class="font-display-currency-mobile md:font-display-currency text-display-currency-mobile md:text-display-currency text-on-background">₹1.95</span>
+<span class="font-body-lg text-body-lg text-on-surface-variant">Cr Total Invested</span>
+</div>
+<p class="font-body-md text-body-md text-accent-gold mt-2">Generating ₹50,500 monthly income</p>
+</section>
+<!-- Investments List -->
+<section class="flex flex-col gap-card-gap">
+
+<template x-for="inv in investments" :key="inv.id">
+    <div @click="openEditModal(inv)" class="bg-gradient-to-br from-[#1c2b3c] to-[#0d1b2a] p-[24px] rounded-xl cursor-pointer lift-card shadow-[0_12px_24px_rgba(0,0,0,0.5),0_4px_12px_rgba(0,0,0,0.2)] border border-white/5 relative overflow-hidden group hover:-translate-y-2 transition-transform">
+        <div class="absolute inset-0 bg-gradient-to-t from-black/10 to-transparent pointer-events-none mix-blend-overlay"></div>
+        <div class="flex justify-between items-start mb-4 relative z-10">
+            <div class="flex flex-col gap-2">
+                <div class="flex items-center gap-2">
+                    <span class="bg-[#122131]/80 px-3 py-1 rounded-full font-label-caps text-label-caps text-on-surface-variant border border-outline-variant backdrop-blur-sm" x-text="inv.type"></span>
+                    <h3 class="font-headline-md text-headline-md-mobile md:text-headline-md text-on-surface" x-text="inv.name"></h3>
+                </div>
+                <p class="font-body-md text-body-md text-on-surface-variant" x-text="(inv.issuer ? inv.issuer + ' • ' : '') + 'Matures ' + formatDate(inv.maturityDate)"></p>
+            </div>
+            <div class="flex flex-col items-end gap-1">
+                <span class="font-headline-md text-headline-md-mobile md:text-headline-md text-on-background" x-text="formatCurrency(inv.amount)"></span>
+                <div class="flex items-center gap-1 text-primary">
+                    <span class="material-symbols-outlined text-sm">trending_up</span>
+                    <span class="font-body-md text-body-md" x-text="inv.rate + '%'"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+<div x-show="investments.length === 0" class="text-center p-8 text-on-surface-variant">
+    No investments found. Click + to add.
+</div>
+</section>
+
+</main>
+
+<main x-show="activePage === 'import'" x-cloak class="flex-grow flex flex-col items-center justify-center px-container-padding-mobile md:px-container-padding-desktop w-full max-w-3xl mx-auto space-y-8">
+<!-- Header Section -->
+<div class="text-center space-y-2 w-full">
+<h2 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-white">Import Data</h2>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-md mx-auto">Securely upload your financial statements for automated parsing and analysis.</p>
+</div>
+<!-- 3D Inset Drop Zone -->
+<div @click="$refs.fileInput.click()" class="w-full bg-surface-container-lowest border border-outline-variant rounded-xl p-12 flex flex-col items-center justify-center text-center matte-surface shadow-3d lift-transition relative overflow-hidden group cursor-pointer glow-accent hover:border-accent/50">
+<!-- Subtle background texture/gradient for depth -->
+<div class="absolute inset-0 bg-gradient-to-b from-black/10 to-transparent pointer-events-none"></div>
+<div class="bg-surface-container rounded-full p-4 mb-4 shadow-3d group-hover:scale-110 transition-transform duration-300 glow-accent">
+<span class="material-symbols-outlined text-4xl text-accent" style="font-variation-settings: 'FILL' 1;">upload_file</span>
+</div>
+<h3 class="font-headline-md text-headline-md-mobile text-white mb-2">Drop your PDF statement here</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">or click to browse from your device</p>
+<button @click.stop="$refs.fileInput.click()" class="px-6 py-2 rounded-lg border border-accent text-accent font-body-md text-body-md hover:bg-accent/10 transition-colors shadow-3d lift-transition glow-accent">
+                Browse Files
+            </button>
+</div>
+<input type="file" x-ref="fileInput" @change="handleFileUpload" class="hidden" accept=".pdf" />
+<!-- Form Section -->
+<div class="w-full space-y-6">
+<!-- Password Field -->
+<div class="space-y-2 relative">
+<label class="font-label-caps text-label-caps text-on-surface-variant flex items-center gap-2" for="doc-password">
+<span class="material-symbols-outlined text-[16px]">lock</span>
+                    Document Password (if encrypted)
+                </label>
+<div class="relative lift-transition">
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-white font-body-md text-body-md placeholder:text-outline focus:border-primary focus:outline-none input-glow transition-all duration-300 shadow-inset-deep matte-surface lift-transition" id="doc-password" x-model="pdfPassword" placeholder="Enter password" type="password">
+<button class="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-white transition-colors">
+<span class="material-symbols-outlined">visibility_off</span>
+</button>
+</div>
+<p class="font-label-caps text-label-caps text-on-surface-variant opacity-70">Passwords are never stored and used only for local decryption.</p>
+</div>
+<!-- Action Button -->
+<button @click="processStatement()" class="w-full bg-primary text-on-primary font-headline-md text-headline-md-mobile md:text-headline-md py-4 rounded-xl shadow-3d lift-transition hover:glow-selected flex justify-center items-center gap-3">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">document_scanner</span>
+                Parse Statement
+            </button>
+</div>
+</main>
+
+<main x-show="activePage === 'tax'" x-cloak class="flex-grow w-full max-w-7xl mx-auto px-container-padding-mobile md:px-container-padding-desktop flex flex-col gap-unit">
+<div class="mb-unit mt-unit">
+<h2 class="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface">Tax Summary</h2>
+<p class="font-body-md text-body-md text-on-surface-variant mt-2">Financial Year 2023-2024</p>
+</div>
+<div class="flex flex-col gap-6 md:gap-8 max-w-3xl">
+<!-- Card 1: Interest Income -->
+<div class="bg-gradient-to-br from-[#23354a] to-[#1a2838] rounded-xl relative overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.6)] hover:shadow-[0_12px_48px_rgba(0,201,167,0.3),0_32px_64px_rgba(0,0,0,0.8)] hover:ring-1 hover:ring-[#00C9A7]/30 transition-all duration-200 transform hover:-translate-y-4 group cursor-pointer active:scale-[0.98]">
+<div class="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"></div>
+<div class="absolute left-0 top-0 bottom-0 w-2 bg-primary shadow-[2px_0_8px_rgba(0,201,167,0.4)]"></div>
+<div class="p-6 md:p-8 pl-8 md:pl-10 relative z-10">
+<div class="flex items-center justify-between mb-4">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Total Interest Income</span>
+<span class="material-symbols-outlined text-primary opacity-70 group-hover:opacity-100 transition-opacity drop-shadow-[0_0_4px_rgba(0,201,167,0.4)]">trending_up</span>
+</div>
+<div class="font-display-currency-mobile md:font-display-currency text-display-currency-mobile md:text-display-currency text-on-surface">
+                        <span x-text="formatCurrency(totalInterestIncome || 0)"></span>
+                    </div>
+</div>
+</div>
+<!-- Card 2: TDS -->
+<div class="bg-gradient-to-br from-[#23354a] to-[#1a2838] rounded-xl relative overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.6)] hover:shadow-[0_12px_48px_rgba(224,191,184,0.3),0_32px_64px_rgba(0,0,0,0.8)] hover:ring-1 hover:ring-[#E0BFB8]/30 transition-all duration-200 transform hover:-translate-y-4 group cursor-pointer active:scale-[0.98]">
+<div class="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"></div>
+<div class="absolute left-0 top-0 bottom-0 w-2 bg-[#E0BFB8] shadow-[2px_0_8px_rgba(224,191,184,0.4)]"></div>
+<div class="p-6 md:p-8 pl-8 md:pl-10 relative z-10">
+<div class="flex items-center justify-between mb-4">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">TDS Deducted</span>
+<span class="material-symbols-outlined text-[#E0BFB8] opacity-70 group-hover:opacity-100 transition-opacity drop-shadow-[0_0_4px_rgba(224,191,184,0.4)]">receipt</span>
+</div>
+<div class="font-display-currency-mobile md:font-display-currency text-display-currency-mobile md:text-display-currency text-on-surface">
+                        <span x-text="formatCurrency(totalTds || 0)"></span>
+                    </div>
+</div>
+</div>
+<!-- Card 3: Net Tax -->
+<div class="bg-gradient-to-br from-[#23354a] to-[#1a2838] rounded-xl relative overflow-hidden shadow-[0_8px_32px_rgba(0,0,0,0.6)] hover:shadow-[0_12px_48px_rgba(212,175,55,0.3),0_32px_64px_rgba(0,0,0,0.8)] hover:ring-1 hover:ring-[#D4AF37]/30 transition-all duration-200 transform hover:-translate-y-4 group cursor-pointer active:scale-[0.98]">
+<div class="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none"></div>
+<div class="absolute left-0 top-0 bottom-0 w-2 bg-[#D4AF37] shadow-[2px_0_8px_rgba(212,175,55,0.4)]"></div>
+<div class="p-6 md:p-8 pl-8 md:pl-10 relative z-10">
+<div class="flex items-center justify-between mb-4">
+<span class="font-label-caps text-label-caps text-on-surface-variant uppercase tracking-wider">Net Tax Payable</span>
+<span class="material-symbols-outlined text-[#D4AF37] opacity-70 group-hover:opacity-100 transition-opacity drop-shadow-[0_0_4px_rgba(212,175,55,0.4)]">account_balance</span>
+</div>
+<div class="font-display-currency-mobile md:font-display-currency text-display-currency-mobile md:text-display-currency text-on-surface">
+                        <span x-text="formatCurrency(netTaxPayable || 0)"></span>
+                    </div>
+<div class="mt-4 inline-flex items-center px-3 py-1 rounded-full bg-gradient-to-b from-[#273647] to-[#1c2b3c] border border-surface-bright shadow-[inset_0_1px_2px_rgba(255,255,255,0.05),0_2px_4px_rgba(0,0,0,0.2)]">
+<span class="w-2 h-2 rounded-full bg-primary mr-2 shadow-[0_0_8px_rgba(0,201,167,0.8)]"></span>
+<span class="font-label-caps text-label-caps text-on-surface">Fully settled</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+
+<main class="flex-1 overflow-x-hidden overflow-y-auto pt-28 px-4 md:px-8 max-w-7xl mx-auto flex flex-col gap-8 pb-32">
+<!-- ┌──────────────────────────────────────────────┐ --><!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Rajender Finance Manager (RFM)</title>
+    <meta name="description" content="A private, offline-first financial OS for managing investments, cash flow, net worth, goals, and pension. Simple decisions. Secure future.">
+
+    <!-- Tailwind CSS (via CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdfa', 100: '#ccfbf1', 200: '#99f6e4',
+                            300: '#5eead4', 400: '#2dd4bf', 500: '#14b8a6',
+                            600: '#0d9488', 700: '#0f766e', 800: '#115e59', 900: '#134e4a',
+                        }
+                    },
+                    fontFamily: { sans: ['Inter', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+
+    <!-- Chart.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
+    <!-- Capacitor Plugins -->
+    <script defer src="plugins.js"></script>
+
+    <!-- Statement Parser (Phase 5) -->
+    <script defer src="parser.js"></script>
+
+    <!-- App Logic (must load before Alpine) -->
+    <script defer src="app.js"></script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased" x-data="appData" x-cloak>
+
+    <div class="flex h-screen overflow-hidden">
+
+        <!-- ════════════════════════════════════════════════════════
+             SIDEBAR (Desktop)
+        ═════════════════════════════════════════════════════════ -->
+        <aside class="hidden md:flex flex-col w-64 bg-slate-900 text-slate-300 shadow-xl z-20 flex-shrink-0">
+            <div class="flex flex-col items-center justify-center h-24 bg-slate-950 text-white border-b border-slate-800">
+                <h1 class="font-bold text-2xl tracking-wider"><span class="text-brand-400">RFM</span></h1>
+                <p class="text-xs text-slate-400 mt-1">Simple decisions. Secure future.</p>
+            </div>
+            <nav class="flex-1 overflow-y-auto py-4 space-y-1 px-3">
+                <template x-for="page in [
+                    { id: 'home',        icon: '🏠', name: 'Dashboard'      },
+                    { id: 'investments', icon: '📈', name: 'Investments'    },
+                    { id: 'portfolio',   icon: '📊', name: 'Portfolio'      },
+                    { id: 'cashflow',    icon: '💸', name: 'Cash Flow'      },
+                    { id: 'pension',     icon: '🏦', name: 'My Pension'     },
+                    { id: 'networth',    icon: '🏛️', name: 'Net Worth'      },
+                    { id: 'emergency',   icon: '🛡️', name: 'Emergency Fund' },
+                    { id: 'goals',       icon: '🎯', name: 'My Goals'       },
+            { id: 'sips',       icon: 'event_repeat',            name: 'SIP & Recurring' },
+                    { id: 'maturity',    icon: '📅', name: 'Maturity Calendar'},
+                    { id: 'tax',         icon: '📄', name: 'Tax Estimate'   },
+                    { id: 'itr',         icon: '✅', name: 'ITR Checklist'  },
+                    { id: 'import',      icon: '📥', name: 'Import Data'    },
+                    { id: 'learn',       icon: '📖', name: 'Learn Your RFM' },
+                    { id: 'about',       icon: 'ℹ️', name: 'About'          }
+                ]">
+                    <button
+                        @click="activePage = page.id"
+                        class="w-full flex items-center px-4 py-2.5 text-sm font-medium rounded-lg transition-colors duration-150"
+                        :class="activePage === page.id ? 'bg-brand-700 text-white shadow-md' : 'hover:bg-slate-800 hover:text-white'"
+                    >
+                        <span class="mr-3 text-base" x-text="page.icon"></span>
+                        <span x-text="page.name"></span>
+                    </button>
+                </template>
+            </nav>
+            <div class="p-4 border-t border-slate-800 text-xs text-slate-500 text-center">
+                RFM v2.0 · Offline First
+            </div>
+        </aside>
+
+        <!-- ════════════════════════════════════════════════════════
+             MAIN CONTENT AREA
+        ═════════════════════════════════════════════════════════ -->
+        <div class="flex-1 flex flex-col h-screen overflow-hidden relative" x-data="{ mobileMenuOpen: false }">
+
+            <!-- Mobile Header -->
+            <header class="md:hidden flex items-center justify-between bg-slate-900 h-14 px-4 text-white z-30 shadow-md flex-shrink-0">
+                <div class="font-bold text-xl tracking-wider"><span class="text-brand-400">RFM</span></div>
+                <button @click="mobileMenuOpen = !mobileMenuOpen" class="p-2 rounded-md hover:bg-slate-800">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+            </header>
+
+            <!-- Mobile Navigation Overlay -->
+            <div x-show="mobileMenuOpen"
+                 class="md:hidden fixed inset-0 z-40 bg-slate-900 backdrop-blur-md"
+                 x-transition:enter="transition ease-out duration-200"
+                 x-transition:enter-start="opacity-0"
+                 x-transition:enter-end="opacity-100"
+                 x-transition:leave="transition ease-in duration-150"
+                 x-transition:leave-start="opacity-100"
+                 x-transition:leave-end="opacity-0">
+                <div class="flex justify-between items-center p-4 border-b border-slate-800">
+                    <span class="font-bold text-xl text-brand-400">RFM</span>
+                    <button @click="mobileMenuOpen = false" class="text-white p-2">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
+                </div>
+                <nav class="flex flex-col py-4 space-y-1 px-4 overflow-y-auto h-full">
+                    <template x-for="page in [
+                        { id: 'home',        name: '🏠 Dashboard'       },
+                        { id: 'investments', name: '📈 Investments'     },
+                        { id: 'portfolio',   name: '📊 Portfolio'       },
+                        { id: 'cashflow',    name: '💸 Cash Flow'       },
+                        { id: 'pension',     name: '🏦 My Pension'      },
+                        { id: 'networth',    name: '🏛️ Net Worth'       },
+                        { id: 'emergency',   name: '🛡️ Emergency Fund'  },
+                        { id: 'goals',       name: '🎯 My Goals'        },
+                        { id: 'sips',        name: '🔁 SIP & Recurring' },
+                        { id: 'tax',         name: '📄 Tax Estimate'    },
+                        { id: 'itr',         name: '✅ ITR Checklist'   },
+                        { id: 'import',      name: '📥 Import Data'     }
+                    ]">
+                        <button
+                            @click="activePage = page.id; mobileMenuOpen = false"
+                            class="w-full text-left px-4 py-3 text-base font-medium rounded-lg text-white transition-colors"
+                            :class="activePage === page.id ? 'bg-brand-700' : 'hover:bg-slate-800'"
+                            x-text="page.name"
+                        ></button>
+                    </template>
+                </nav>
+            </div>
+
+            <!-- ════════════════════════════════════════════════════
+                 PAGE CONTENT
+            ═════════════════════════════════════════════════════ -->
+            <main class="flex-1 overflow-x-hidden overflow-y-auto bg-slate-50 p-4 md:p-8">
+
+
+                <!-- ┌──────────────────────────────────────────────┐ -->
+                <!-- │  3. PORTFOLIO OVERVIEW (Deliverable 2)       │ -->
+                <!-- └──────────────────────────────────────────────┘ -->
+                <div x-show="activePage === 'portfolio'"
+                     x-transition.opacity.duration.300ms
+                     x-effect="if (activePage === 'portfolio') renderPortfolioCharts()"
+                     style="display:none">
+                    <h2 class="text-3xl font-bold text-slate-800 mb-1">Portfolio Overview</h2>
+                    <p class="text-slate-500 mb-6">Analysis of your investment holdings.</p>
+
+                    <!-- Summary Metrics -->
+                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+                            <p class="text-xs font-medium text-slate-500 mb-1 uppercase tracking-wider">Total Invested</p>
+                            <p class="text-2xl font-bold text-slate-800" x-text="formatCurrency(totalInvested)"></p>
+                        </div>
+                        <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+                            <p class="text-xs font-medium text-slate-500 mb-1 uppercase tracking-wider">Monthly Income</p>
+                            <p class="text-2xl font-bold text-emerald-600" x-text="formatCurrency(monthlyInvestmentIncome)"></p>
+                        </div>
+                        <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+                            <p class="text-xs font-medium text-slate-500 mb-1 uppercase tracking-wider">Weighted Avg. Return</p>
+                            <p class="text-2xl font-bold text-brand-600" x-text="weightedAvgReturn + '%'"></p>
+                        </div>
+                        <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+                            <p class="text-xs font-medium text-slate-500 mb-1 uppercase tracking-wider">No. of Holdings</p>
+                            <p class="text-2xl font-bold text-slate-800" x-text="investments.length"></p>
+                        </div>
+                    </div>
+
+                    <!-- Concentration Warning -->
+                    <template x-if="concentrationWarnings.length > 0">
+                        <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-start space-x-3">
+                            <span class="text-amber-500 text-xl mt-0.5">⚠️</span>
+                            <div>
+                                <p class="font-semibold text-amber-800">Concentration Risk Detected</p>
+                                <template x-for="w in concentrationWarnings">
+                                    <p class="text-sm text-amber-700" x-text="w.name + ' accounts for ' + w.pct + '% of your total portfolio. Consider diversifying.'"></p>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+
+                    <!-- Charts -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <!-- Allocation Doughnut -->
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                            <h3 class="text-base font-semibold text-slate-800 mb-4">Asset Allocation by Type</h3>
+                            <template x-if="investments.length > 0">
+                                <div class="relative" style="height:260px">
+                                    <canvas id="allocationChart"></canvas>
+                                </div>
+                            </template>
+                            <template x-if="investments.length === 0">
+                                <div class="flex items-center justify-center h-48 text-slate-400 text-sm">
+                                    Add investments to see allocation chart
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Rating Bar -->
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                            <h3 class="text-base font-semibold text-slate-800 mb-4">Portfolio by Rating</h3>
+                            <template x-if="investments.length > 0">
+                                <div class="relative" style="height:260px">
+                                    <canvas id="ratingChart"></canvas>
+                                </div>
+                            </template>
+                            <template x-if="investments.length === 0">
+                                <div class="flex items-center justify-center h-48 text-slate-400 text-sm">
+                                    Add investments to see rating distribution
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Holdings Detail -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="p-5 border-b border-slate-100">
+                            <h3 class="text-base font-semibold text-slate-800">Holdings Detail</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm">
+                                <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                                    <tr>
+                                        <th class="p-4 text-left font-medium">Name</th>
+                                        <th class="p-4 text-left font-medium">Type</th>
+                                        <th class="p-4 text-left font-medium">Rating</th>
+                                        <th class="p-4 text-right font-medium">Amount</th>
+                                        <th class="p-4 text-right font-medium">Weight %</th>
+                                        <th class="p-4 text-right font-medium">Return %</th>
+                                        <th class="p-4 text-right font-medium">Annual Income</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <template x-for="inv in investments" :key="inv.id">
+                                        <tr class="border-t border-slate-100 hover:bg-slate-50">
+                                            <td class="p-4 font-medium text-slate-800" x-text="inv.name"></td>
+                                            <td class="p-4 text-slate-600" x-text="inv.type"></td>
+                                            <td class="p-4">
+                                                <span class="px-2 py-0.5 rounded-full text-xs font-medium"
+                                                    :class="inv.rating ? 'bg-green-50 text-green-700' : 'bg-slate-100 text-slate-500'"
+                                                    x-text="inv.rating || 'N/A'"></span>
+                                            </td>
+                                            <td class="p-4 text-right font-medium" x-text="formatCurrency(inv.amount)"></td>
+                                            <td class="p-4 text-right text-slate-600" x-text="totalInvested > 0 ? ((inv.amount / totalInvested) * 100).toFixed(1) + '%' : '—'"></td>
+                                            <td class="p-4 text-right text-brand-600 font-semibold" x-text="inv.rate + '%'"></td>
+                                            <td class="p-4 text-right text-emerald-600" x-text="inv.payout === 'Cumulative' ? 'Reinvested' : formatCurrency(inv.amount * inv.rate / 100)"></td>
+                                        </tr>
+                                    </template>
+                                    <tr x-show="investments.length === 0">
+                                        <td colspan="7" class="p-10 text-center text-slate-400">No investments to display.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- ┌──────────────────────────────────────────────┐ -->
+                <!-- │  4. CASH FLOW                                │ -->
+                <!-- └──────────────────────────────────────────────┘ -->
+                <div x-show="activePage === 'cashflow'" x-transition.opacity.duration.300ms style="display:none">
+                    <h2 class="text-3xl font-bold text-slate-800 mb-6">Cash Flow</h2>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                        <!-- Income -->
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                            <h3 class="text-base font-semibold text-emerald-700 mb-4 flex items-center"><span class="mr-2">📥</span>Monthly Income</h3>
+                            <div class="space-y-4">
+                                <!-- Pension is READ-ONLY here — source of truth is Pension module -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1">Pension</label>
+                                    <div class="flex items-center justify-between px-3 py-2 rounded-md bg-slate-50 border border-slate-200">
+                                        <span class="font-medium text-slate-800" x-text="formatCurrency(pension.monthlyAmount)"></span>
+                                        <button @click="activePage = 'pension'" class="text-xs text-brand-600 hover:text-brand-800 font-medium">
+                                            Edit in Pension →
+                                        </button>
+                                    </div>
+                                    <p class="text-xs text-slate-400 mt-1">Managed in My Pension module</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1">Project / Consulting Income</label>
+                                    <input type="number" x-model.number="cashflow.project" class="w-full px-3 py-2 rounded-md border border-slate-300 focus:ring-1 focus:ring-brand-500 outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1">Other Income</label>
+                                    <input type="number" x-model.number="cashflow.otherIncome" class="w-full px-3 py-2 rounded-md border border-slate-300 focus:ring-1 focus:ring-brand-500 outline-none">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Expenses -->
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                            <h3 class="text-base font-semibold text-rose-700 mb-4 flex items-center"><span class="mr-2">📤</span>Monthly Expenses</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1">Housing &amp; Utilities</label>
+                                    <input type="number" x-model.number="cashflow.housing" class="w-full px-3 py-2 rounded-md border border-slate-300 focus:ring-1 focus:ring-brand-500 outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1">Food &amp; Household</label>
+                                    <input type="number" x-model.number="cashflow.food" class="w-full px-3 py-2 rounded-md border border-slate-300 focus:ring-1 focus:ring-brand-500 outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1">Medical / Insurance</label>
+                                    <input type="number" x-model.number="cashflow.medical" class="w-full px-3 py-2 rounded-md border border-slate-300 focus:ring-1 focus:ring-brand-500 outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1">Other Expenses</label>
+                                    <input type="number" x-model.number="cashflow.otherExpense" class="w-full px-3 py-2 rounded-md border border-slate-300 focus:ring-1 focus:ring-brand-500 outline-none">
+                                </div>
+                                <!-- SIP & Recurring row (Phase 9) -->
+                                <div x-show="totalMonthlySipOutflow > 0">
+                                    <div class="flex items-center justify-between px-3 py-2 rounded-xl bg-primary/5 border border-primary/20">
+                                        <div class="flex items-center gap-2">
+                                            <span class="material-symbols-outlined text-sm text-primary" style="font-variation-settings:'FILL' 1;">event_repeat</span>
+                                            <span class="text-sm font-medium text-on-surface-variant">SIP &amp; Recurring</span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-sm font-semibold text-primary" x-text="formatCurrency(totalMonthlySipOutflow)"></span>
+                                            <button @click.stop="activePage = 'sips'" class="text-xs text-on-surface-variant hover:text-primary transition-colors">Manage →</button>
+                                        </div>
+                                    </div>
+                                    <p class="text-xs text-on-surface-variant/60 mt-1" x-text="activeSipCount + ' active plan' + (activeSipCount !== 1 ? 's' : '') + ' auto-included in expenses'"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Summary -->
+                        <div class="bg-slate-900 rounded-xl shadow-lg border border-slate-700 p-6 text-white flex flex-col justify-between">
+                            <div>
+                                <h3 class="text-base font-semibold text-slate-300 mb-5">Summary</h3>
+                                <div class="flex justify-between items-center mb-4">
+                                    <span class="text-slate-400 text-sm">Total Income</span>
+                                    <span class="text-lg font-semibold text-emerald-400" x-text="formatCurrency(totalIncome)"></span>
+                                </div>
+                                <div class="flex justify-between items-center mb-4">
+                                    <span class="text-slate-400 text-sm">Total Expenses</span>
+                                    <span class="text-lg font-semibold text-rose-400" x-text="formatCurrency(totalExpense)"></span>
+                                </div>
+                                <hr class="border-slate-700 my-4">
+                                <div class="flex justify-between items-center">
+                                    <span class="text-slate-200 font-medium">Monthly Surplus</span>
+                                    <span class="text-2xl font-bold" :class="monthlySurplus >= 0 ? 'text-white' : 'text-rose-400'" x-text="formatCurrency(monthlySurplus)"></span>
+                                </div>
+                            </div>
+                            <div class="mt-6 bg-slate-800 p-4 rounded-lg">
+                                <span class="block text-xs text-slate-400 mb-1">Savings Rate</span>
+                                <div class="flex items-center">
+                                    <span class="text-2xl font-bold text-brand-400 mr-2" x-text="savingsRate + '%'"></span>
+                                    <span class="text-xs text-slate-500">(Target: 20%+)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- ┌──────────────────────────────────────────────┐ -->
+                <!-- │  5. PENSION MANAGER (Deliverable 4)          │ -->
+                <!-- └──────────────────────────────────────────────┘ -->
+                <div x-show="activePage === 'pension'" x-transition.opacity.duration.300ms style="display:none">
+                    <h2 class="text-3xl font-bold text-slate-800 mb-1">My Pension</h2>
+                    <p class="text-slate-500 mb-6">Single source of truth for your pension income. Changes here flow automatically to Cash Flow &amp; Tax.</p>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                        <!-- Edit Pension -->
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 lg:col-span-1">
+                            <h3 class="text-base font-semibold text-slate-800 mb-4">Pension Details</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1">Monthly Pension Amount (₹)</label>
+                                    <input id="pension-amount" type="number"
+                                        :value="pension.monthlyAmount"
+                                        @change="updatePension($event.target.value)"
+                                        class="w-full px-3 py-2 rounded-md border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none text-lg font-semibold">
+                                    <p class="text-xs text-slate-400 mt-1">Updating this logs a revision automatically.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 mb-1">Pension Type</label>
+                                    <select x-model="pension.type" class="w-full px-3 py-2 rounded-md border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none">
+                                        <option>Government</option>
+                                        <option>Military</option>
+                                        <option>Corporate</option>
+                                        <option>Other</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Pension Summary Cards -->
+                        <div class="lg:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div class="bg-gradient-to-br from-brand-700 to-brand-900 rounded-xl p-5 text-white">
+                                <p class="text-xs text-brand-200 font-medium uppercase tracking-wider mb-1">Monthly</p>
+                                <p class="text-2xl font-bold" x-text="formatCurrency(pension.monthlyAmount)"></p>
+                            </div>
+                            <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+                                <p class="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Annual</p>
+                                <p class="text-2xl font-bold text-slate-800" x-text="formatCurrency(annualPension)"></p>
+                            </div>
+                            <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+                                <p class="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Type</p>
+                                <p class="text-xl font-bold text-slate-800" x-text="pension.type"></p>
+                                <p class="text-xs text-brand-600 mt-1">Auto-feeds Tax module</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Revision History -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="p-5 border-b border-slate-100">
+                            <h3 class="text-base font-semibold text-slate-800">Revision History</h3>
+                            <p class="text-xs text-slate-400 mt-0.5">Every change to your pension amount is recorded here automatically.</p>
+                        </div>
+                        <template x-if="pension.revisions.length > 0">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-sm">
+                                    <thead class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider">
+                                        <tr>
+                                            <th class="p-4 text-left font-medium">Date</th>
+                                            <th class="p-4 text-left font-medium">Previous Amount</th>
+                                            <th class="p-4 text-left font-medium">Note</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <template x-for="(rev, idx) in [...pension.revisions].reverse()" :key="idx">
+                                            <tr class="border-t border-slate-100">
+                                                <td class="p-4 text-slate-600" x-text="formatDate(rev.date)"></td>
+                                                <td class="p-4 font-medium text-slate-800" x-text="formatCurrency(rev.previousAmount)"></td>
+                                                <td class="p-4 text-slate-500" x-text="rev.note || '—'"></td>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </template>
+                        <template x-if="pension.revisions.length === 0">
+                            <div class="p-8 text-center text-slate-400 text-sm">
+                                No revision history yet. Changes to your pension amount will appear here.
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+
+                <!-- ┌──────────────────────────────────────────────┐ -->
+                <!-- │  6. NET WORTH                                │ -->
+                <!-- └──────────────────────────────────────────────┘ -->
+                <div x-show="activePage === 'networth'" x-transition.opacity.duration.300ms style="display:none">
+                    <h2 class="text-3xl font-bold text-slate-800 mb-6">Net Worth</h2>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <!-- Assets -->
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                            <h3 class="text-lg font-semibold text-slate-800 mb-4 flex justify-between">
+                                <span>Assets <span class="text-sm font-normal text-slate-400">(What you own)</span></span>
+                                <span class="text-brand-600" x-text="formatCurrency(totalAssets)"></span>
+                            </h3>
+                            <div class="space-y-4">
+                                <div><label class="block text-sm font-medium text-slate-600 mb-1">Bank Balance</label>
+                                    <input type="number" x-model.number="networth.bank" class="w-full px-3 py-2 rounded-md border border-slate-300 focus:ring-1 focus:ring-brand-500 outline-none"></div>
+                                <div><label class="block text-sm font-medium text-slate-600 mb-1">Cash on Hand</label>
+                                    <input type="number" x-model.number="networth.cash" class="w-full px-3 py-2 rounded-md border border-slate-300 focus:ring-1 focus:ring-brand-500 outline-none"></div>
+                                <div><label class="block text-sm font-medium text-slate-600 mb-1">Property Value</label>
+                                    <input type="number" x-model.number="networth.property" class="w-full px-3 py-2 rounded-md border border-slate-300 focus:ring-1 focus:ring-brand-500 outline-none"></div>
+                                <div><label class="block text-sm font-medium text-slate-600 mb-1">Other Assets (Gold, Vehicles)</label>
+                                    <input type="number" x-model.number="networth.otherAsset" class="w-full px-3 py-2 rounded-md border border-slate-300 focus:ring-1 focus:ring-brand-500 outline-none"></div>
+                                <div class="pt-2 border-t border-slate-100">
+                                    <p class="text-xs text-slate-400">Investments (auto-included): <span class="font-medium text-slate-600" x-text="formatCurrency(totalInvested)"></span></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Liabilities -->
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                            <h3 class="text-lg font-semibold text-slate-800 mb-4 flex justify-between">
+                                <span>Liabilities <span class="text-sm font-normal text-slate-400">(What you owe)</span></span>
+                                <span class="text-rose-600" x-text="formatCurrency(totalLiabilities)"></span>
+                            </h3>
+                            <div class="space-y-4">
+                                <div><label class="block text-sm font-medium text-slate-600 mb-1">Home Loan</label>
+                                    <input type="number" x-model.number="networth.homeLoan" class="w-full px-3 py-2 rounded-md border border-slate-300 focus:ring-1 focus:ring-brand-500 outline-none"></div>
+                                <div><label class="block text-sm font-medium text-slate-600 mb-1">Personal Loan</label>
+                                    <input type="number" x-model.number="networth.personalLoan" class="w-full px-3 py-2 rounded-md border border-slate-300 focus:ring-1 focus:ring-brand-500 outline-none"></div>
+                                <div><label class="block text-sm font-medium text-slate-600 mb-1">Credit Card Dues</label>
+                                    <input type="number" x-model.number="networth.credit" class="w-full px-3 py-2 rounded-md border border-slate-300 focus:ring-1 focus:ring-brand-500 outline-none"></div>
+                                <div><label class="block text-sm font-medium text-slate-600 mb-1">Other Debt</label>
+                                    <input type="number" x-model.number="networth.otherDebt" class="w-full px-3 py-2 rounded-md border border-slate-300 focus:ring-1 focus:ring-brand-500 outline-none"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Net Worth Summary -->
+                    <div class="bg-brand-700 rounded-xl shadow-md p-6 text-white flex flex-col md:flex-row items-center justify-between">
+                        <div>
+                            <h3 class="text-base text-brand-200 font-medium mb-1">Total Net Worth</h3>
+                            <p class="text-4xl font-bold" x-text="formatCurrency(netWorthTotal)"></p>
+                        </div>
+                        <div class="mt-4 md:mt-0 text-right">
+                            <p class="text-brand-200 text-sm">Debt to Asset Ratio</p>
+                            <p class="text-2xl font-semibold" x-text="debtRatio + '%'"></p>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- ┌──────────────────────────────────────────────┐ -->
+                <!-- │  7. EMERGENCY FUND                           │ -->
+                <!-- └──────────────────────────────────────────────┘ -->
+                <div x-show="activePage === 'emergency'" x-transition.opacity.duration.300ms style="display:none">
+                    <h2 class="text-3xl font-bold text-slate-800 mb-6">Emergency Fund</h2>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+                            <div><label class="block text-sm font-medium text-slate-600 mb-1">Monthly Essential Expenses (₹)</label>
+                                <input type="number" x-model.number="emergency.efMonthly" class="w-full px-3 py-2 rounded-md border border-slate-300 focus:ring-1 focus:ring-brand-500 outline-none"></div>
+                            <div><label class="block text-sm font-medium text-slate-600 mb-1">Target Months of Safety</label>
+                                <input type="number" x-model.number="emergency.efMonths" class="w-full px-3 py-2 rounded-md border border-slate-300 focus:ring-1 focus:ring-brand-500 outline-none"></div>
+                            <div class="pt-4 border-t border-slate-200">
+                                <label class="block text-sm font-medium text-slate-600 mb-1">Current Saved Fund (₹)</label>
+                                <input type="number" x-model.number="emergency.efCurrent" class="w-full px-3 py-2 rounded-md border border-brand-300 focus:ring-2 focus:ring-brand-500 outline-none bg-brand-50">
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 lg:col-span-2 flex flex-col justify-center">
+                            <div class="flex justify-between items-end mb-2">
+                                <div>
+                                    <p class="text-sm font-medium text-slate-500">Progress to Target</p>
+                                    <p class="text-xl font-bold text-slate-800" x-text="formatCurrency(emergency.efCurrent) + ' / ' + formatCurrency(efRequired)"></p>
+                                </div>
+                                <p class="text-3xl font-bold text-brand-600" x-text="efProgress + '%'"></p>
+                            </div>
+                            <div class="w-full bg-slate-100 rounded-full h-4 mb-6 overflow-hidden shadow-inner">
+                                <div class="h-4 rounded-full transition-all duration-500 ease-out"
+                                    :class="efProgress >= 100 ? 'bg-emerald-500' : 'bg-brand-500'"
+                                    :style="'width:' + efProgress + '%'"></div>
+                            </div>
+                            <div class="p-4 bg-slate-50 rounded-lg border border-slate-100">
+                                <p class="text-slate-600 text-sm" x-show="efGap > 0">
+                                    You have a gap of <span class="font-semibold text-slate-800" x-text="formatCurrency(efGap)"></span> to reach your goal of <span x-text="emergency.efMonths"></span> months safety.
+                                    <span x-show="monthlySurplus > 0"> With your current surplus, you could reach this in <span class="font-semibold" x-text="Math.ceil(efGap / monthlySurplus)"></span> months.</span>
+                                </p>
+                                <p class="text-emerald-700 font-semibold text-sm" x-show="efGap <= 0">
+                                    ✅ Excellent! Emergency fund fully funded. Direct surplus cash to investments.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- ┌──────────────────────────────────────────────┐ -->
+                <!-- │  8. MY GOALS (Deliverable 3)                 │ -->
+                <!-- └──────────────────────────────────────────────┘ -->
+                <div x-show="activePage === 'goals'" x-transition.opacity.duration.300ms style="display:none">
+                    <h2 class="text-3xl font-bold text-slate-800 mb-1">My Goals</h2>
+                    <p class="text-slate-500 mb-6">Track your financial targets. Know how much to save each month.</p>
+
+                    <!-- Add Goal Form -->
+                    <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+                        <h3 class="text-base font-semibold text-slate-800 mb-4">Add New Goal</h3>
+                        <form @submit.prevent="addGoal()" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                            <input type="text" x-model="newGoal.name" placeholder="Goal name (e.g. Car)" required
+                                class="px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none text-sm">
+                            <select x-model="newGoal.type" class="px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none text-sm">
+                                <option>Emergency Fund</option>
+                                <option>Retirement</option>
+                                <option>New Car</option>
+                                <option>House</option>
+                                <option>Education</option>
+                                <option>Travel</option>
+                                <option>Custom</option>
+                            </select>
+                            <input type="number" x-model="newGoal.target" placeholder="Target Amount ₹" required min="1"
+                                class="px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none text-sm">
+                            <input type="number" x-model="newGoal.current" placeholder="Current Saved ₹"
+                                class="px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none text-sm">
+                            <input type="date" x-model="newGoal.targetDate"
+                                class="px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none text-sm">
+                            <div class="sm:col-span-2 lg:col-span-5">
+                                <button type="submit" class="w-full bg-brand-700 hover:bg-brand-800 text-white font-medium py-2.5 px-4 rounded-lg transition-colors text-sm">
+                                    + Add Goal
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Goals Grid -->
+                    <div x-show="goals.length === 0" class="bg-white rounded-xl p-10 text-center text-slate-400 shadow-sm border border-slate-200">
+                        No goals yet. Add your first financial goal above.
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                        <template x-for="g in goalsProgress" :key="g.id">
+                            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 hover:shadow-md transition-shadow">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-2xl" x-text="goalTypeEmoji(g.type)"></span>
+                                        <div>
+                                            <h4 class="font-semibold text-slate-800 leading-tight" x-text="g.name"></h4>
+                                            <span class="text-xs text-slate-400" x-text="g.type"></span>
+                                        </div>
+                                    </div>
+                                    <div class="flex space-x-1">
+                                        <button @click="openGoalEdit(g)" class="text-xs px-2 py-1 bg-brand-50 text-brand-700 rounded hover:bg-brand-100 transition-colors">Edit</button>
+                                        <button @click="deleteGoal(g.id)" class="text-xs px-2 py-1 bg-rose-50 text-rose-600 rounded hover:bg-rose-100 transition-colors">✕</button>
+                                    </div>
+                                </div>
+
+                                <!-- Progress -->
+                                <div class="flex justify-between items-center text-sm mb-1">
+                                    <span class="text-slate-500" x-text="formatCurrency(g.current)"></span>
+                                    <span class="font-semibold text-brand-700" x-text="g.pct + '%'"></span>
+                                </div>
+                                <div class="w-full bg-slate-100 rounded-full h-3 mb-3 overflow-hidden">
+                                    <div class="h-3 rounded-full transition-all duration-500"
+                                        :class="g.pct >= 100 ? 'bg-emerald-500' : 'bg-brand-500'"
+                                        :style="'width:' + g.pct + '%'"></div>
+                                </div>
+
+                                <div class="text-xs text-slate-500 space-y-1">
+                                    <div class="flex justify-between">
+                                        <span>Target</span>
+                                        <span class="font-medium text-slate-700" x-text="formatCurrency(g.target)"></span>
+                                    </div>
+                                    <div class="flex justify-between" x-show="g.gap > 0">
+                                        <span>Remaining</span>
+                                        <span class="font-medium text-slate-700" x-text="formatCurrency(g.gap)"></span>
+                                    </div>
+                                    <div class="flex justify-between" x-show="g.monthlyNeeded > 0">
+                                        <span>Monthly needed</span>
+                                        <span class="font-semibold text-brand-600" x-text="formatCurrency(g.monthlyNeeded)"></span>
+                                    </div>
+                                    <div class="flex justify-between" x-show="g.targetDate">
+                                        <span>Target date</span>
+                                        <span class="font-medium text-slate-700" x-text="formatDate(g.targetDate)"></span>
+                                    </div>
+                                    <div class="mt-2 pt-2 border-t border-slate-100 text-center text-emerald-600 font-semibold" x-show="g.pct >= 100">
+                                        ✅ Goal Achieved!
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+
+                    <!-- GOAL EDIT MODAL -->
+                    <div x-show="editingGoal"
+                         class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+                         x-transition:enter="transition ease-out duration-200"
+                         x-transition:enter-start="opacity-0"
+                         x-transition:enter-end="opacity-100"
+                         x-transition:leave="transition ease-in duration-150"
+                         x-transition:leave-start="opacity-100"
+                         x-transition:leave-end="opacity-0"
+                         style="display:none">
+                        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6"
+                             x-transition:enter="transition ease-out duration-200"
+                             x-transition:enter-start="opacity-0 scale-95"
+                             x-transition:enter-end="opacity-100 scale-100">
+                            <div class="flex justify-between items-center mb-5">
+                                <h3 class="text-lg font-bold text-slate-800">Edit Goal</h3>
+                                <button @click="cancelGoalEdit()" class="text-slate-400 hover:text-slate-600">✕</button>
+                            </div>
+                            <div class="space-y-3 mb-5">
+                                <div><label class="block text-xs font-medium text-slate-600 mb-1">Goal Name</label>
+                                    <input type="text" x-model="editGoalForm.name" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none text-sm"></div>
+                                <div><label class="block text-xs font-medium text-slate-600 mb-1">Type</label>
+                                    <select x-model="editGoalForm.type" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none text-sm">
+                                        <option>Emergency Fund</option><option>Retirement</option><option>New Car</option>
+                                        <option>House</option><option>Education</option><option>Travel</option><option>Custom</option>
+                                    </select></div>
+                                <div><label class="block text-xs font-medium text-slate-600 mb-1">Target Amount (₹)</label>
+                                    <input type="number" x-model="editGoalForm.target" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none text-sm"></div>
+                                <div><label class="block text-xs font-medium text-slate-600 mb-1">Current Saved (₹)</label>
+                                    <input type="number" x-model="editGoalForm.current" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none text-sm"></div>
+                                <div><label class="block text-xs font-medium text-slate-600 mb-1">Target Date</label>
+                                    <input type="date" x-model="editGoalForm.targetDate" class="w-full px-3 py-2 rounded-lg border border-slate-300 focus:ring-2 focus:ring-brand-500 outline-none text-sm"></div>
+                            </div>
+                            <div class="flex space-x-3">
+                                <button @click="saveGoalEdit()" class="flex-1 bg-brand-700 hover:bg-brand-800 text-white font-medium py-2.5 rounded-lg transition-colors text-sm">Save</button>
+                                <button @click="cancelGoalEdit()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium py-2.5 rounded-lg transition-colors text-sm">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                
+</main>
+
+<!-- FAB -->
+<button @click="activePage = 'investments'" class="fixed bottom-24 right-6 w-14 h-14 bg-primary text-on-primary-container rounded-2xl shadow-[0_4px_12px_rgba(0,201,167,0.4),0_20px_40px_rgba(0,0,0,0.4)] hover:shadow-[0_16px_32px_rgba(0,201,167,0.5),0_40px_80px_rgba(0,0,0,0.6)] flex items-center justify-center hover:-translate-y-3 active:translate-y-0 active:shadow-[0_4px_12px_rgba(0,201,167,0.4),0_10px_20px_rgba(0,0,0,0.4)] transition-all duration-200 z-40 border border-primary-fixed">
+<span class="material-symbols-outlined text-[28px]" style="font-variation-settings: 'FILL' 1;">add</span>
+</button>
+
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center px-4 py-3 pb-safe bg-gradient-to-t from-[#0d1c2d] to-[#122131] border-t border-white/5 shadow-[0_-4px_12px_rgba(0,0,0,0.2)] rounded-t-xl md:hidden">
+<!-- Dashboard -->
+<button @click="activePage = 'home'" :class="activePage === 'home' ? 'bg-primary-container text-on-primary-container -translate-y-2 shadow-[0_8px_16px_rgba(0,201,167,0.4),0_0_15px_rgba(0,201,167,0.2)] border-primary/50' : 'text-on-surface-variant hover:text-[#d4af37] hover:-translate-y-2'" class="flex flex-col items-center justify-center bg-primary-container text-on-primary-container rounded-xl p-2 -translate-y-2 shadow-[0_8px_16px_rgba(0,201,167,0.4),0_0_15px_rgba(0,201,167,0.2)] transition-all duration-200 w-16 h-16 border border-primary/50 hover:-translate-y-3">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-caps text-[10px] leading-tight">Dashboard</span>
+</button>
+<!-- Investments -->
+<button @click="activePage = 'investments'" :class="activePage === 'investments' ? 'bg-primary-container text-on-primary-container -translate-y-2 shadow-[0_8px_16px_rgba(0,201,167,0.4),0_0_15px_rgba(0,201,167,0.2)] border-primary/50' : 'text-on-surface-variant hover:text-[#d4af37] hover:-translate-y-2'" class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:text-[#d4af37] hover:-translate-y-2 transition-all duration-200 rounded-xl w-16 h-16">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">account_balance_wallet</span>
+<span class="font-label-caps text-[10px] leading-tight">Investments</span>
+</button>
+<!-- Import -->
+<button @click="activePage = 'import'" :class="activePage === 'import' ? 'bg-primary-container text-on-primary-container -translate-y-2 shadow-[0_8px_16px_rgba(0,201,167,0.4),0_0_15px_rgba(0,201,167,0.2)] border-primary/50' : 'text-on-surface-variant hover:text-[#d4af37] hover:-translate-y-2'" class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:text-[#d4af37] hover:-translate-y-2 transition-all duration-200 rounded-xl w-16 h-16">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">upload_file</span>
+<span class="font-label-caps text-[10px] leading-tight">Import</span>
+</button>
+<!-- Tax -->
+<button @click="activePage = 'tax'" :class="activePage === 'tax' ? 'bg-primary-container text-on-primary-container -translate-y-2 shadow-[0_8px_16px_rgba(0,201,167,0.4),0_0_15px_rgba(0,201,167,0.2)] border-primary/50' : 'text-on-surface-variant hover:text-[#d4af37] hover:-translate-y-2'" class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:text-[#d4af37] hover:-translate-y-2 transition-all duration-200 rounded-xl w-16 h-16">
+<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">receipt_long</span>
+<span class="font-label-caps text-[10px] leading-tight">Tax</span>
+</button>
+</nav>
+<!-- Desktop Side/Top Nav placeholder to ensure consistency if viewed on wider screens (Hidden on Mobile) -->
+<nav class="hidden md:flex fixed top-4 right-20 bg-gradient-to-br from-[#122131] to-[#0d1c2d] border border-white/5 rounded-xl shadow-[0_4px_12px_rgba(0,0,0,0.15)] h-16 items-center px-4 gap-2 z-50 transition-all duration-200">
+<button class="flex items-center gap-2 px-4 py-2 bg-primary-container text-on-primary-container rounded-lg font-label-caps text-label-caps shadow-[0_4px_12px_rgba(0,201,167,0.3)] hover:-translate-y-1.5 hover:shadow-[0_8px_16px_rgba(0,201,167,0.4)] transition-all duration-200 border border-primary/50">
+<span class="material-symbols-outlined text-[18px]" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+            Dashboard
+        </button>
+<button class="flex items-center gap-2 px-4 py-2 text-on-surface-variant hover:text-[#d4af37] hover:-translate-y-1.5 transition-all duration-200 rounded-lg font-label-caps text-label-caps">
+<span class="material-symbols-outlined text-[18px]">account_balance_wallet</span>
+            Investments
+        </button>
+<button class="flex items-center gap-2 px-4 py-2 text-on-surface-variant hover:text-[#d4af37] hover:-translate-y-1.5 transition-all duration-200 rounded-lg font-label-caps text-label-caps">
+<span class="material-symbols-outlined text-[18px]">upload_file</span>
+            Import
+        </button>
+<button class="flex items-center gap-2 px-4 py-2 text-on-surface-variant hover:text-[#d4af37] hover:-translate-y-1.5 transition-all duration-200 rounded-lg font-label-caps text-label-caps">
+<span class="material-symbols-outlined text-[18px]">receipt_long</span>
+            Tax
+        </button>
+</nav>
+
+
+
+
+</body>
+</html>

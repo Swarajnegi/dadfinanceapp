@@ -3,6 +3,7 @@ document.addEventListener('alpine:init', () => {
 
         // ── UI State ────────────────────────────────────────────────
         activePage: 'home',
+        showNotifications: false,
 
         // ── Data Stores ─────────────────────────────────────────────
         investments: [],
@@ -838,6 +839,115 @@ document.addEventListener('alpine:init', () => {
             return 'Needs Attention';
         },
 
+        // ── Formatters & Notifications ─────────────────────────────────
+        formatCurrency(amount) {
+            const val = Number(amount) || 0;
+            return new Intl.NumberFormat('en-IN', {
+                style: 'currency',
+                currency: 'INR',
+                maximumFractionDigits: 0
+            }).format(val);
+        },
+
+        formatDate(dateStr) {
+            if (!dateStr) return 'N/A';
+            try {
+                const d = new Date(dateStr);
+                if (isNaN(d.getTime())) return dateStr;
+                return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+            } catch (e) {
+                return dateStr;
+            }
+        },
+
+        get notificationsList() {
+            const list = [];
+            const today = new Date();
+
+            // 1. Maturing Investments (within 90 days)
+            (this.investments || []).forEach(inv => {
+                if (inv.maturityDate) {
+                    const mDate = new Date(inv.maturityDate);
+                    const diffDays = Math.ceil((mDate - today) / (1000 * 60 * 60 * 24));
+                    if (diffDays >= 0 && diffDays <= 90) {
+                        list.push({
+                            id: 'mat_' + inv.id,
+                            type: 'warning',
+                            icon: 'calendar_clock',
+                            title: `${inv.name} Maturing Soon`,
+                            detail: `Matures in ${diffDays} days (${this.formatDate(inv.maturityDate)}) — Value: ${this.formatCurrency(this.getInvCurrentValue(inv))}`,
+                            actionPage: 'investments'
+                        });
+                    } else if (diffDays < 0) {
+                        list.push({
+                            id: 'mat_exp_' + inv.id,
+                            type: 'alert',
+                            icon: 'history',
+                            title: `${inv.name} Has Matured`,
+                            detail: `Matured on ${this.formatDate(inv.maturityDate)}. Consider reinvesting.`,
+                            actionPage: 'investments'
+                        });
+                    }
+                }
+            });
+
+            // 2. Concentration Risk Warnings
+            (this.concentrationWarnings || []).forEach((w, idx) => {
+                list.push({
+                    id: 'conc_' + idx,
+                    type: 'alert',
+                    icon: 'warning',
+                    title: 'High Concentration Risk',
+                    detail: `${w.name} accounts for ${w.pct}% of your total portfolio. Consider diversifying.`,
+                    actionPage: 'investments'
+                });
+            });
+
+            // 3. Upcoming SIP Debits (Next 7 days)
+            const currentDay = today.getDate();
+            (this.activeSips || []).forEach(sip => {
+                const debitDay = Number(sip.dayOfMonth) || 5;
+                let daysUntil = debitDay - currentDay;
+                if (daysUntil < 0) daysUntil += 30;
+                if (daysUntil <= 7) {
+                    list.push({
+                        id: 'sip_' + sip.id,
+                        type: 'info',
+                        icon: 'event_repeat',
+                        title: `SIP Debit Approaching: ${sip.name}`,
+                        detail: `₹${sip.monthlyAmount} will be debited on the ${debitDay}th of the month.`,
+                        actionPage: 'investments'
+                    });
+                }
+            });
+
+            // 4. Emergency Fund Gap Alert
+            if (this.efGap > 0) {
+                list.push({
+                    id: 'ef_gap',
+                    type: 'info',
+                    icon: 'shield_locked',
+                    title: 'Emergency Fund Below Target',
+                    detail: `Gap of ${this.formatCurrency(this.efGap)} to reach ${this.emergency.efMonths} months safety buffer.`,
+                    actionPage: 'home'
+                });
+            }
+
+            // Default System Welcome Notification if list is empty
+            if (list.length === 0) {
+                list.push({
+                    id: 'welcome',
+                    type: 'success',
+                    icon: 'check_circle',
+                    title: 'All Systems Optimal',
+                    detail: 'No urgent portfolio actions or upcoming maturity alerts at this time.',
+                    actionPage: 'home'
+                });
+            }
+
+            return list;
+        },
+
         get healthStrengths() {
             const s = [];
             if (this.monthlySurplus > 0) s.push('Positive monthly cash flow');
@@ -1162,6 +1272,28 @@ document.addEventListener('alpine:init', () => {
                 note:            'Manual update'
             });
             this.pension.monthlyAmount = next;
+        },
+
+        deletePensionRevision(idx) {
+            if (confirm('Delete this revision record?')) {
+                this.pension.revisions.splice(idx, 1);
+            }
+        },
+
+        get maturingInvestments() {
+            return (this.investments || [])
+                .filter(inv => inv.maturityDate)
+                .map(inv => {
+                    const today = new Date();
+                    const mDate = new Date(inv.maturityDate);
+                    const daysLeft = Math.ceil((mDate - today) / (1000 * 60 * 60 * 24));
+                    let status = 'normal';
+                    if (daysLeft < 0) status = 'expired';
+                    else if (daysLeft <= 30) status = 'urgent';
+                    else if (daysLeft <= 90) status = 'soon';
+                    return { ...inv, daysLeft, status };
+                })
+                .sort((a, b) => new Date(a.maturityDate) - new Date(b.maturityDate));
         },
 
         // ── used by the pension input field (two-way without full update overhead)

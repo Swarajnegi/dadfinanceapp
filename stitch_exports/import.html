@@ -1,0 +1,292 @@
+<!DOCTYPE html><html class="dark" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>RFM - Import Data</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&amp;family=Outfit:wght@600;700&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "accent": "#E5B584", /* Subtle Rose Gold */
+                      "on-primary-container": "#004e40",
+                      "outline": "#85948e",
+                      "tertiary-fixed-dim": "#bac8dc",
+                      "on-secondary": "#233143",
+                      "surface": "#051424",
+                      "secondary": "#b8c8de",
+                      "primary-fixed-dim": "#38debb",
+                      "surface-dim": "#051424",
+                      "on-surface": "#d4e4fa",
+                      "on-tertiary": "#243141",
+                      "inverse-surface": "#d4e4fa",
+                      "surface-variant": "#273647",
+                      "background": "#0d1b2a", /* Updated to match dark navy design system base */
+                      "surface-container": "#122131",
+                      "outline-variant": "#3c4a45",
+                      "primary-fixed": "#5ffbd6",
+                      "error": "#ffb4ab",
+                      "inverse-on-surface": "#233143",
+                      "secondary-container": "#3e4d5f",
+                      "primary-container": "#00c9a7",
+                      "on-error": "#690005",
+                      "surface-tint": "#38debb",
+                      "tertiary-fixed": "#d6e4f9",
+                      "on-secondary-fixed-variant": "#39485a",
+                      "on-tertiary-fixed": "#0f1c2c",
+                      "on-primary-fixed-variant": "#005142",
+                      "surface-container-low": "#0d1c2d",
+                      "surface-container-high": "#1c2b3c",
+                      "on-primary-fixed": "#002019",
+                      "surface-container-lowest": "#010f1f",
+                      "tertiary": "#c0cee3",
+                      "error-container": "#93000a",
+                      "surface-container-highest": "#273647",
+                      "on-background": "#d4e4fa",
+                      "on-tertiary-container": "#384556",
+                      "secondary-fixed": "#d4e4fb",
+                      "inverse-primary": "#006b58",
+                      "on-tertiary-fixed-variant": "#3a4859",
+                      "secondary-fixed-dim": "#b8c8de",
+                      "on-error-container": "#ffdad6",
+                      "on-primary": "#00382d",
+                      "primary": "#44e5c2",
+                      "tertiary-container": "#a5b3c7",
+                      "on-secondary-fixed": "#0d1d2d",
+                      "on-secondary-container": "#aebdd3",
+                      "on-surface-variant": "#bacac3",
+                      "surface-bright": "#2c3a4c"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.25rem",
+                      "lg": "0.5rem",
+                      "xl": "0.75rem",
+                      "full": "9999px"
+              },
+              "spacing": {
+                      "container-padding-desktop": "40px",
+                      "container-padding-mobile": "20px",
+                      "card-gap": "16px",
+                      "gutter": "24px",
+                      "unit": "8px"
+              },
+              "fontFamily": {
+                      "body-md": [
+                              "Inter"
+                      ],
+                      "display-currency-mobile": [
+                              "Outfit"
+                      ],
+                      "display-currency": [
+                              "Outfit"
+                      ],
+                      "headline-lg": [
+                              "Outfit"
+                      ],
+                      "headline-md": [
+                              "Outfit"
+                      ],
+                      "body-lg": [
+                              "Inter"
+                      ],
+                      "label-caps": [
+                              "Inter"
+                      ]
+              },
+              "fontSize": {
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "display-currency-mobile": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "letterSpacing": "-0.01em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "display-currency": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "700"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "headline-md": [
+                              "24px",
+                              {
+                                      "lineHeight": "32px",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "label-caps": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.05em",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+      },
+          },
+        }
+    </script>
+<style>
+        /* Base styles */
+        body {
+            background-color: theme('colors.background');
+            color: theme('colors.on-background');
+        }
+        
+        /* Polished Matte Finish */
+        .matte-surface {
+            background-image: linear-gradient(145deg, rgba(255, 255, 255, 0.05) 0%, rgba(0, 0, 0, 0.25) 100%);
+        }
+
+        /* 3D Elevation */
+        .shadow-3d {
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3), 0 10px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Lift Animation */
+        .lift-transition {
+            transition: transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.15s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .lift-transition:hover, .lift-transition:active, .lift-active {
+            transform: translateY(-12px);
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4), 0 32px 48px rgba(0, 0, 0, 0.8);
+        }
+
+        /* Selection Glow */
+        .glow-selected {
+            box-shadow: 0 0 0 1px #00C9A7, 0 0 16px rgba(0, 201, 167, 0.3);
+        }
+        
+        .glow-accent:hover {
+            box-shadow: 0 0 0 1px #E5B584, 0 0 16px rgba(229, 181, 132, 0.3);
+        }
+        
+        /* Input Focus Glow */
+        .input-glow:focus {
+            box-shadow: 0 0 0 1px #00C9A7, 0 0 16px rgba(0, 201, 167, 0.3);
+        }
+
+        /* Legacy Overrides */
+        .shadow-inset-deep {
+            /* Now acting as a subtle inner recess to contrast with 3d cards */
+            box-shadow: inset 0 4px 12px rgba(0, 0, 0, 0.4), 
+                        inset 0 1px 2px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="font-body-md text-body-md antialiased min-h-screen flex flex-col pt-24 pb-24 md:pb-8 bg-background matte-surface">
+<!-- TopAppBar -->
+<nav class="fixed top-4 left-4 right-4 rounded-xl flex justify-between items-center px-4 h-16 max-w-7xl mx-auto z-50 bg-surface-container matte-surface shadow-3d lift-transition">
+<!-- Leading: Implicitly requested 'avatar' in JSON, but using layout -->
+<div class="flex items-center gap-3 hover:scale-105 transition-transform cursor-pointer">
+<img class="w-8 h-8 rounded-full object-cover border border-outline-variant" data-alt="A small circular profile picture of an Indian retiree, warm lighting, professional yet approachable expression, high resolution, dark background context." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDifANdx-V-5WSjNm1vrYq6E14anLe14Pu_2ic1d_yVNZHcgq_Ze48Hbb60SxXWri7S-S5BGFMmY30Pq_PuND7JvbdMffLoIwo7kTRLiI9iX7xRlZ6zS-DbrGBOifJL75L-VAxxYwdv5vcdB689RypxMoP2H8uCh3gye4Tl8h7ojG2w3HpxPULhi2nt_C2337xwye8tX0Zn3h3FpclziyZxpBFkN3-q2PwWZP1usK7tkD2_pKbin2n612BZlzPq8rvv6zaY8oZm7sx2">
+</div>
+<!-- Headline -->
+<h1 class="font-headline-md text-headline-md-mobile md:text-headline-md text-white tracking-tight">RFM</h1>
+<!-- Trailing -->
+<button class="text-accent transition-transform active:scale-95 duration-200 w-10 h-10 flex items-center justify-center rounded-full bg-surface-container-low border border-outline-variant shadow-3d lift-transition glow-accent">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</nav>
+<!-- Main Content Canvas -->
+<main class="flex-grow flex flex-col items-center justify-center px-container-padding-mobile md:px-container-padding-desktop w-full max-w-3xl mx-auto space-y-8">
+<!-- Header Section -->
+<div class="text-center space-y-2 w-full">
+<h2 class="font-headline-lg text-headline-lg-mobile md:text-headline-lg text-white">Import Data</h2>
+<p class="font-body-md text-body-md text-on-surface-variant max-w-md mx-auto">Securely upload your financial statements for automated parsing and analysis.</p>
+</div>
+<!-- 3D Inset Drop Zone -->
+<div class="w-full bg-surface-container-lowest border border-outline-variant rounded-xl p-12 flex flex-col items-center justify-center text-center matte-surface shadow-3d lift-transition relative overflow-hidden group cursor-pointer glow-accent hover:border-accent/50">
+<!-- Subtle background texture/gradient for depth -->
+<div class="absolute inset-0 bg-gradient-to-b from-black/10 to-transparent pointer-events-none"></div>
+<div class="bg-surface-container rounded-full p-4 mb-4 shadow-3d group-hover:scale-110 transition-transform duration-300 glow-accent">
+<span class="material-symbols-outlined text-4xl text-accent" style="font-variation-settings: 'FILL' 1;">upload_file</span>
+</div>
+<h3 class="font-headline-md text-headline-md-mobile text-white mb-2">Drop your PDF statement here</h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">or click to browse from your device</p>
+<button class="px-6 py-2 rounded-lg border border-accent text-accent font-body-md text-body-md hover:bg-accent/10 transition-colors shadow-3d lift-transition glow-accent">
+                Browse Files
+            </button>
+</div>
+<!-- Form Section -->
+<div class="w-full space-y-6">
+<!-- Password Field -->
+<div class="space-y-2 relative">
+<label class="font-label-caps text-label-caps text-on-surface-variant flex items-center gap-2" for="doc-password">
+<span class="material-symbols-outlined text-[16px]">lock</span>
+                    Document Password (if encrypted)
+                </label>
+<div class="relative lift-transition">
+<input class="w-full bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-white font-body-md text-body-md placeholder:text-outline focus:border-primary focus:outline-none input-glow transition-all duration-300 shadow-inset-deep matte-surface lift-transition" id="doc-password" placeholder="Enter password" type="password">
+<button class="absolute right-3 top-1/2 -translate-y-1/2 text-outline hover:text-white transition-colors">
+<span class="material-symbols-outlined">visibility_off</span>
+</button>
+</div>
+<p class="font-label-caps text-label-caps text-on-surface-variant opacity-70">Passwords are never stored and used only for local decryption.</p>
+</div>
+<!-- Action Button -->
+<button class="w-full bg-primary text-on-primary font-headline-md text-headline-md-mobile md:text-headline-md py-4 rounded-xl shadow-3d lift-transition hover:glow-selected flex justify-center items-center gap-3">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">document_scanner</span>
+                Parse Statement
+            </button>
+</div>
+</main>
+<!-- BottomNavBar (Mobile Only Responsive Pivot) -->
+<nav class="md:hidden fixed bottom-0 w-full z-50 flex justify-around items-center px-4 py-3 pb-safe bg-surface-container-high border-t border-outline-variant shadow-3d matte-surface rounded-t-xl">
+<!-- Dashboard (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:bg-surface-variant rounded-lg transition-colors lift-transition hover:glow-selected" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-caps text-label-caps mt-1">Dashboard</span>
+</a>
+<!-- Investments (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:bg-surface-variant rounded-lg transition-colors lift-transition hover:glow-selected" href="#">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="font-label-caps text-label-caps mt-1">Investments</span>
+</a>
+<!-- Import (Active) -->
+<a class="flex flex-col items-center justify-center bg-primary text-on-primary rounded-xl p-2 shadow-3d lift-active glow-selected transition-transform duration-300" href="#">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">upload_file</span>
+<span class="font-label-caps text-label-caps mt-1 font-bold">Import</span>
+</a>
+<!-- Tax (Inactive) -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant p-2 hover:bg-surface-variant rounded-lg transition-colors lift-transition hover:glow-selected" href="#">
+<span class="material-symbols-outlined">receipt_long</span>
+<span class="font-label-caps text-label-caps mt-1">Tax</span>
+</a>
+</nav>
+
+
+</body></html>
