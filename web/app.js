@@ -74,7 +74,7 @@ document.addEventListener('alpine:init', () => {
             name: '', type: 'Stock', issuer: '', amount: '',
             rate: '', payout: 'Monthly', rating: '', maturityDate: '',
             ticker: '', units: '', buyPrice: '', currentPrice: '',
-            purchaseDate: '', assetClass: 'equity'
+            purchaseDate: '', assetClass: 'equity', schemeCode: ''
         },
         newGoal: {
             name: '', type: 'Emergency Fund',
@@ -89,6 +89,14 @@ document.addEventListener('alpine:init', () => {
         // ── Internal chart instances (not reactive state) ────────────
         _allocationChart: null,
         _ratingChart: null,
+
+        // ── Phase 11: Live NAV & Stock Price Ingestion ──────────────
+        navFetchState: 'idle', // 'idle' | 'fetching' | 'done' | 'error'
+        navFetchError: '',
+        lastNavFetchTime: null,
+        mfSearchResults: [],
+        isSearchingMf: false,
+        mfSearchQuery: '',
 
         // ── Import State (Phase 5) ───────────────────────────────────
         importState: 'idle',
@@ -1633,6 +1641,121 @@ document.addEventListener('alpine:init', () => {
             this.importResults = null;
             this.importFile = null;
             this.importState = 'done';
+        },
+
+        // ════════════════════════════════════════════════════════════
+        //  PHASE 11: LIVE NAV & STOCK PRICE INGESTION ENGINE
+        // ════════════════════════════════════════════════════════════
+
+        // Search AMFI Mutual Fund schemes by query
+        async searchMfScheme(query, targetForm) {
+            const q = (query || this.mfSearchQuery || '').trim();
+            if (q.length < 3) {
+                this.mfSearchResults = [];
+                return;
+            }
+            this.isSearchingMf = true;
+            try {
+                const res = await fetch(`https://api.mfapi.in/mf/search?q=${encodeURIComponent(q)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    this.mfSearchResults = (data || []).slice(0, 8);
+                }
+            } catch (err) {
+                console.warn('Failed to search AMFI MF schemes:', err);
+                this.mfSearchResults = [];
+            } finally {
+                this.isSearchingMf = false;
+            }
+        },
+
+        // Select an AMFI Mutual Fund scheme for new/edited investment
+        selectMfScheme(targetForm, scheme) {
+            if (!targetForm) return;
+            targetForm.schemeCode = String(scheme.schemeCode);
+            if (!targetForm.name || targetForm.name === 'Stock' || targetForm.name === 'Mutual Fund') {
+                targetForm.name = scheme.schemeName;
+            }
+            this.mfSearchResults = [];
+            this.mfSearchQuery = '';
+        },
+
+        // Fetch single Mutual Fund NAV or Stock Price
+        async fetchSinglePrice(inv) {
+            if (!inv) return null;
+
+            // 1. Mutual Fund via AMFI API
+            if (inv.schemeCode) {
+                try {
+                    const res = await fetch(`https://api.mfapi.in/mf/${inv.schemeCode}`);
+                    if (res.ok) {
+                        const data = await res.json();
+                        const latest = data?.data?.[0];
+                        if (latest && latest.nav) {
+                            const newNav = parseFloat(latest.nav);
+                            inv.currentPrice = newNav;
+                            if (Number(inv.units) > 0) {
+                                inv.currentValue = Math.round(Number(inv.units) * newNav * 100) / 100;
+                            }
+                            inv.lastNavUpdate = new Date().toISOString();
+                            return newNav;
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`Failed to fetch NAV for scheme ${inv.schemeCode}:`, e);
+                }
+            }
+
+            // 2. Stock / ETF via Yahoo Finance chart API
+            if (inv.ticker) {
+                try {
+                    const cleanSymbol = inv.ticker.trim().toUpperCase().replace(/\.NS$|\.BO$/, '');
+                    const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${cleanSymbol}.NS`;
+                    const res = await fetch(yahooUrl);
+                    if (res.ok) {
+                        const data = await res.json();
+                        const meta = data.chart?.result?.[0]?.meta;
+                        const price = meta?.regularMarketPrice || meta?.chartPreviousClose;
+                        if (price) {
+                            inv.currentPrice = price;
+                            if (Number(inv.units) > 0) {
+                                inv.currentValue = Math.round(Number(inv.units) * price * 100) / 100;
+                            }
+                            inv.lastNavUpdate = new Date().toISOString();
+                            return price;
+                        }
+                    }
+                } catch (e) {
+                    console.warn(`Failed to fetch price for ticker ${inv.ticker}:`, e);
+                }
+            }
+
+            return null;
+        },
+
+        // Fetch live NAVs & prices for ALL eligible holdings in portfolio
+        async fetchAllPrices() {
+            this.navFetchState = 'fetching';
+            this.navFetchError = '';
+
+            let updatedCount = 0;
+            try {
+                for (const inv of (this.investments || [])) {
+                    if (inv.schemeCode || inv.ticker) {
+                        const updatedPrice = await this.fetchSinglePrice(inv);
+                        if (updatedPrice) updatedCount++;
+                        await new Promise(r => setTimeout(r, 250));
+                    }
+                }
+
+                this.lastNavFetchTime = new Date().toISOString();
+                this.navFetchState = 'done';
+                this.saveData();
+            } catch (err) {
+                console.error('Error fetching live prices:', err);
+                this.navFetchState = 'error';
+                this.navFetchError = 'Failed to sync some prices. Please try again.';
+            }
         },
 
         // ════════════════════════════════════════════════════════════
