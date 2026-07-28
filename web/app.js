@@ -138,6 +138,9 @@ document.addEventListener('alpine:init', () => {
         // ── Regenerative Wealth State ────────────────────────────────
         regenWealth: {
             apiKey:       '',
+            provider:     'auto', // 'auto' | 'gemini' | 'openrouter' | 'openai'
+            model:        'google/gemini-2.0-flash-001',
+            customModel:  '',
             apiKeySet:    false,
             showKeyInput: false,
             loading:      false,
@@ -172,11 +175,14 @@ document.addEventListener('alpine:init', () => {
             // ITR checklist state (UI-only, not persisted)
             this.itrCheckState = {};
 
-            // ── Regenerative Wealth: restore API key and load cached analysis ──
-            const savedKey = localStorage.getItem('rfm_gemini_key');
+            // ── Regenerative Wealth: restore API key, provider & model settings ──
+            const savedKey = localStorage.getItem('rfm_api_key') || localStorage.getItem('rfm_gemini_key');
             if (savedKey) {
-                this.regenWealth.apiKey    = savedKey;
-                this.regenWealth.apiKeySet = true;
+                this.regenWealth.apiKey       = savedKey;
+                this.regenWealth.apiKeySet    = true;
+                this.regenWealth.provider     = localStorage.getItem('rfm_api_provider') || 'auto';
+                this.regenWealth.model        = localStorage.getItem('rfm_api_model') || 'google/gemini-2.0-flash-001';
+                this.regenWealth.customModel = localStorage.getItem('rfm_api_custom_model') || '';
             }
             const cached = window.RegenWealth?.loadCached();
             if (cached) this.regenWealth.analysis = cached;
@@ -1690,9 +1696,6 @@ document.addEventListener('alpine:init', () => {
         // ════════════════════════════════════════════════════════════
 
         async classifyWithAI(rawText, apiKey) {
-            const GEMINI_ENDPOINT =
-                'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
-
             // Trim text to keep within token limits (~12K chars ~ 3K tokens)
             const truncated = rawText.length > 12000
                 ? rawText.slice(0, 12000) + '\n[...document truncated for analysis...]'
@@ -1752,38 +1755,12 @@ ${truncated}
 
 RULES: Return ONLY valid JSON. No markdown, no explanation. If a field is unknown use null or 0. Amount must be a number (rupees). Do NOT invent data not in the document.`;
 
-            const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: {
-                        responseMimeType: 'application/json',
-                        temperature:       0.1,
-                        maxOutputTokens:   4096
-                    }
-                })
+            const activeModel = this.regenWealth.model === 'custom' ? this.regenWealth.customModel : this.regenWealth.model;
+            const parsed = await window.RegenWealth.callLLM(prompt, apiKey, {
+                provider:    this.regenWealth.provider,
+                model:       activeModel,
+                temperature: 0.1
             });
-
-            if (!res.ok) {
-                const errBody = await res.json().catch(() => ({}));
-                const msg = errBody?.error?.message || `HTTP ${res.status}`;
-                if (res.status === 400) throw new Error(`Invalid API key or request: ${msg}`);
-                if (res.status === 403) throw new Error('API key lacks Gemini access. Check Google AI Studio → API Keys.');
-                if (res.status === 429) throw new Error('Gemini rate limit hit. Wait 60 seconds and try again.');
-                throw new Error(`Gemini API error: ${msg}`);
-            }
-
-            const data = await res.json();
-            const responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-            if (!responseText) throw new Error('Gemini returned an empty response. Please retry.');
-
-            const clean = responseText
-                .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/\s*```\s*$/i, '').trim();
-
-            let parsed;
-            try { parsed = JSON.parse(clean); }
-            catch (e) { throw new Error('Could not parse Gemini response as JSON. Please retry.'); }
 
             // Normalise: ensure all investment fields are correctly typed
             if (parsed.investments) {
@@ -2199,22 +2176,31 @@ RULES: Return ONLY valid JSON. No markdown, no explanation. If a field is unknow
         //  REGENERATIVE WEALTH METHODS
         // ════════════════════════════════════════════════════════════
 
-        // Save the Gemini API key to localStorage and mark as set
+        // Save API key & provider/model settings
         saveRegenApiKey() {
             const key = (this.regenWealth.apiKey || '').trim();
-            if (key.length < 20) {
-                this.regenWealth.error = 'Please enter a valid Gemini API key (it starts with "AIzaSy").';
+            if (key.length < 10) {
+                this.regenWealth.error = 'Please enter a valid API key (OpenRouter, Gemini, or OpenAI).';
                 return;
             }
-            localStorage.setItem('rfm_gemini_key', key);
+            localStorage.setItem('rfm_api_key', key);
+            localStorage.setItem('rfm_gemini_key', key); // Backward compatibility
+            localStorage.setItem('rfm_api_provider', this.regenWealth.provider || 'auto');
+            localStorage.setItem('rfm_api_model', this.regenWealth.model || 'google/gemini-2.0-flash-001');
+            localStorage.setItem('rfm_api_custom_model', this.regenWealth.customModel || '');
+
             this.regenWealth.apiKeySet    = true;
             this.regenWealth.showKeyInput = false;
             this.regenWealth.error        = '';
         },
 
-        // Remove stored API key
+        // Remove stored API key & settings
         clearRegenApiKey() {
+            localStorage.removeItem('rfm_api_key');
             localStorage.removeItem('rfm_gemini_key');
+            localStorage.removeItem('rfm_api_provider');
+            localStorage.removeItem('rfm_api_model');
+            localStorage.removeItem('rfm_api_custom_model');
             this.regenWealth.apiKey       = '';
             this.regenWealth.apiKeySet    = false;
             this.regenWealth.showKeyInput = false;
@@ -2239,14 +2225,20 @@ RULES: Return ONLY valid JSON. No markdown, no explanation. If a field is unknow
                 return;
             }
 
-            this.regenWealth.loading    = true;
-            this.regenWealth.error      = '';
+            this.regenWealth.loading     = true;
+            this.regenWealth.error       = '';
             this.regenWealth.progressMsg = 'Starting analysis...';
+
+            const activeModel = this.regenWealth.model === 'custom' ? this.regenWealth.customModel : this.regenWealth.model;
 
             try {
                 const result = await window.RegenWealth.analyze(
                     this.$data,
                     this.regenWealth.apiKey,
+                    {
+                        provider: this.regenWealth.provider,
+                        model:    activeModel
+                    },
                     (msg) => { this.regenWealth.progressMsg = msg; }
                 );
                 this.regenWealth.analysis    = result;

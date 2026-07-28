@@ -207,19 +207,123 @@ ${hasNews
 }`;
     }
 
-    // ── Gemini API Caller ──────────────────────────────────────────────────────
-    // POSTs to Gemini 2.0 Flash with JSON mode enforced.
-    // Throws a descriptive Error on any failure.
-    async function callGeminiAPI(prompt, apiKey) {
-        const res = await fetch(`${GEMINI_ENDPOINT}?key=${apiKey}`, {
+    // ── Helper: JSON Response Cleaner & Parser ────────────────────────────────
+    function parseJSONResponse(text) {
+        if (!text) throw new Error('AI returned an empty response. Please retry.');
+        const clean = text
+            .replace(/^```json\s*/i, '')
+            .replace(/^```\s*/i, '')
+            .replace(/\s*```\s*$/i, '')
+            .trim();
+        try {
+            return JSON.parse(clean);
+        } catch (e) {
+            throw new Error(`Could not parse AI response as JSON: ${e.message}`);
+        }
+    }
+
+    // ── Provider Auto-Detector ────────────────────────────────────────────────
+    function detectProvider(apiKey) {
+        const key = (apiKey || '').trim();
+        if (key.startsWith('sk-or-')) return 'openrouter';
+        if (key.startsWith('AIza')) return 'gemini';
+        if (key.startsWith('sk-')) return 'openai';
+        return 'openrouter'; // Default fallback for OpenRouter or custom proxy keys
+    }
+
+    // ── Universal Multi-Provider LLM Caller ────────────────────────────────────
+    // Supports:
+    // 1. OpenRouter (sk-or-v1-...) -> https://openrouter.ai/api/v1/chat/completions
+    // 2. Direct Gemini (AIzaSy...)  -> https://generativelanguage.googleapis.com/...
+    // 3. Direct OpenAI (sk-...)     -> https://api.openai.com/v1/chat/completions
+    async function callLLM(prompt, apiKey, options = {}) {
+        const key = (apiKey || '').trim();
+        if (!key) throw new Error('No API key provided.');
+
+        const provider = options.provider && options.provider !== 'auto'
+            ? options.provider
+            : detectProvider(key);
+
+        const temperature = typeof options.temperature === 'number' ? options.temperature : 0.3;
+
+        // 1. OpenRouter API Call
+        if (provider === 'openrouter') {
+            const model = options.model || 'google/gemini-2.0-flash-001';
+            const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+                method:  'POST',
+                headers: {
+                    'Content-Type':  'application/json',
+                    'Authorization': `Bearer ${key}`,
+                    'HTTP-Referer':  'https://github.com/Swarajnegi/dadfinanceapp',
+                    'X-Title':       'RFM Portfolio Advisor'
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: [
+                        { role: 'system', content: 'You are an expert Indian financial advisor. Output ONLY valid JSON.' },
+                        { role: 'user', content: prompt }
+                    ],
+                    response_format: { type: 'json_object' },
+                    temperature: temperature
+                })
+            });
+
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => ({}));
+                const msg = errBody?.error?.message || `HTTP ${res.status}`;
+                if (res.status === 401) throw new Error('Invalid OpenRouter API key. Check key at openrouter.ai/keys');
+                if (res.status === 402) throw new Error('OpenRouter credits depleted. Please top up your account.');
+                if (res.status === 429) throw new Error('OpenRouter rate limit hit. Please retry in 30 seconds.');
+                throw new Error(`OpenRouter API error: ${msg}`);
+            }
+
+            const data = await res.json();
+            const text = data.choices?.[0]?.message?.content;
+            return parseJSONResponse(text);
+        }
+
+        // 2. OpenAI API Call
+        if (provider === 'openai') {
+            const model = options.model || 'gpt-4o-mini';
+            const res = await fetch('https://api.openai.com/v1/chat/completions', {
+                method:  'POST',
+                headers: {
+                    'Content-Type':  'application/json',
+                    'Authorization': `Bearer ${key}`
+                },
+                body: JSON.stringify({
+                    model: model,
+                    messages: [
+                        { role: 'system', content: 'You are an expert Indian financial advisor. Output ONLY valid JSON.' },
+                        { role: 'user', content: prompt }
+                    ],
+                    response_format: { type: 'json_object' },
+                    temperature: temperature
+                })
+            });
+
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => ({}));
+                const msg = errBody?.error?.message || `HTTP ${res.status}`;
+                throw new Error(`OpenAI API error: ${msg}`);
+            }
+
+            const data = await res.json();
+            const text = data.choices?.[0]?.message?.content;
+            return parseJSONResponse(text);
+        }
+
+        // 3. Direct Gemini (Google AI Studio) Call
+        const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
+        const res = await fetch(`${GEMINI_ENDPOINT}?key=${key}`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contents: [{ parts: [{ text: prompt }] }],
                 generationConfig: {
                     responseMimeType: 'application/json',
-                    temperature:      0.4,
-                    maxOutputTokens:  2048
+                    temperature:      temperature,
+                    maxOutputTokens:  4096
                 }
             })
         });
@@ -227,51 +331,46 @@ ${hasNews
         if (!res.ok) {
             const errBody = await res.json().catch(() => ({}));
             const msg = errBody?.error?.message || `HTTP ${res.status}`;
-            // Provide user-friendly messages for common errors
-            if (res.status === 400) throw new Error(`Invalid API key or request format: ${msg}`);
-            if (res.status === 403) throw new Error('API key does not have Gemini access. Check AI Studio → API Keys.');
-            if (res.status === 429) throw new Error('Gemini rate limit hit. Wait 60 seconds and try again.');
+            if (res.status === 400) throw new Error(`Invalid Gemini key or request format: ${msg}`);
+            if (res.status === 403) throw new Error('API key does not have Gemini access. Check AI Studio.');
+            if (res.status === 429) throw new Error('Gemini rate limit hit. Wait 60 seconds.');
             throw new Error(`Gemini API error: ${msg}`);
         }
 
         const data = await res.json();
         const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (!text) throw new Error('Gemini returned an empty response. Please retry.');
-
-        // Strip any accidental markdown code fences
-        const clean = text
-            .replace(/^```json\s*/i, '')
-            .replace(/^```\s*/i, '')
-            .replace(/\s*```\s*$/i, '')
-            .trim();
-
-        try {
-            return JSON.parse(clean);
-        } catch (e) {
-            throw new Error('Could not parse Gemini response as JSON. Please retry.');
-        }
+        return parseJSONResponse(text);
     }
 
     // ── Main Orchestrator ──────────────────────────────────────────────────────
     // Runs the full analysis pipeline: portfolio read → news fetch → AI call.
     // onProgress(msg) is called at each stage for UI feedback.
-    async function analyze(appData, apiKey, onProgress = () => {}) {
-        if (!apiKey || apiKey.trim().length < 20) {
-            throw new Error('Please enter a valid Gemini API key first.');
+    async function analyze(appData, apiKey, options = {}, onProgress = () => {}) {
+        if (!apiKey || apiKey.trim().length < 10) {
+            throw new Error('Please enter a valid API key (OpenRouter, Gemini, or OpenAI).');
         }
 
-        onProgress('Reading your portfolio...');
+        const key = apiKey.trim();
+        const provider = (options.provider && options.provider !== 'auto')
+            ? options.provider
+            : detectProvider(key);
+
+        const modelName = options.model || (provider === 'openrouter' ? 'google/gemini-2.0-flash-001' : 'gemini-2.0-flash');
+
+        onProgress('Reading your portfolio snapshot...');
         const snapshot = buildPortfolioSnapshot(appData);
 
-        onProgress('Fetching live market news from 3 sources...');
+        onProgress('Fetching live market news from 3 RSS sources...');
         const newsResults = await Promise.all(NEWS_FEEDS.map(fetchNewsFeed));
         const successCount = newsResults.filter(f => f.headlines.length > 0).length;
 
-        onProgress(`Building analysis (${successCount}/3 news sources loaded)...`);
+        onProgress(`Building analysis prompt (${successCount}/3 news sources loaded)...`);
         const prompt = buildPrompt(snapshot, newsResults);
 
-        onProgress('Running Gemini 2.0 Flash analysis...');
-        const result = await callGeminiAPI(prompt, apiKey.trim());
+        const providerLabel = provider === 'openrouter' ? `OpenRouter (${modelName})` : provider === 'openai' ? `OpenAI (${modelName})` : 'Gemini 2.0 Flash';
+        onProgress(`Running ${providerLabel} AI analysis...`);
+
+        const result = await callLLM(prompt, key, { provider, model: modelName, temperature: 0.3 });
 
         // Sort by urgency score descending
         if (Array.isArray(result.recommendations)) {
@@ -285,6 +384,7 @@ ${hasNews
                 source: f.source,
                 count:  f.headlines.length
             })),
+            providerUsed: providerLabel,
             timestamp: new Date().toISOString()
         };
 
@@ -314,6 +414,7 @@ ${hasNews
     }
 
     // ── Public API ─────────────────────────────────────────────────────────────
-    return { analyze, loadCached, clearCache };
+    return { callLLM, analyze, detectProvider, loadCached, clearCache };
 
 })();
+
