@@ -158,12 +158,30 @@ document.addEventListener('alpine:init', () => {
             thresholdReached: false
         },
 
+        // ── Phase 14: US & Global Stocks Exchange Rate Support ───────
+        usdInrRate: 86.5,
+        async fetchUsdInrRate() {
+            try {
+                const res = await fetch('https://query1.finance.yahoo.com/v8/finance/chart/INR=X');
+                if (res.ok) {
+                    const data = await res.json();
+                    const rate = data.chart?.result?.[0]?.meta?.regularMarketPrice;
+                    if (rate && rate > 50 && rate < 150) {
+                        this.usdInrRate = rate;
+                    }
+                }
+            } catch (e) {
+                console.warn('Using default fallback USD/INR exchange rate (86.5)');
+            }
+        },
+
         // ════════════════════════════════════════════════════════════
         //  LIFECYCLE
         // ════════════════════════════════════════════════════════════
         init() {
             this.loadData();
             this.initCapacitor();
+            this.fetchUsdInrRate();
             // Phase 12: Schedule native alerts after data loads (fire-and-forget, non-blocking)
             this.scheduleMaturityAlerts();
             this.$watch('investments',  () => this.saveData(), { deep: true });
@@ -1238,17 +1256,19 @@ document.addEventListener('alpine:init', () => {
 
         addInvestment() {
             if (!this.newInv.name) return;
-            const isEquity = ['Stock', 'Equity', 'Mutual Fund', 'ETF'].includes(this.newInv.type);
-            const units = Number(this.newInv.units) || 0;
+            const isEquity = ['Stock', 'Stock (IND)', 'Stock (US)', 'Equity', 'Mutual Fund', 'ETF', 'ETF (IND)', 'ETF (US)'].includes(this.newInv.type);
+            const isUS     = ['Stock (US)', 'ETF (US)'].includes(this.newInv.type);
+            const units    = Number(this.newInv.units) || 0;
             const buyPrice = Number(this.newInv.buyPrice) || 0;
             const currentPrice = Number(this.newInv.currentPrice) || buyPrice || 0;
             
             let amount = Number(this.newInv.amount) || 0;
             if (isEquity && units > 0 && (currentPrice > 0 || buyPrice > 0)) {
-                amount = units * (currentPrice || buyPrice);
+                const usdRate = isUS ? (this.usdInrRate || 86.5) : 1;
+                amount = units * (currentPrice || buyPrice) * usdRate;
             }
 
-            this.investments.push({
+            const createdInv = {
                 ...this.newInv,
                 id:           Date.now(),
                 amount:       amount,
@@ -1256,13 +1276,22 @@ document.addEventListener('alpine:init', () => {
                 buyPrice:     buyPrice,
                 currentPrice: currentPrice || buyPrice,
                 currentValue: amount,
-                rate:         Number(this.newInv.rate) || 0
-            });
-            this.newInv = {
-                name: '', type: 'Stock', issuer: '', amount: '',
-                rate: '', payout: 'Monthly', rating: '', maturityDate: '',
-                ticker: '', units: '', buyPrice: '', currentPrice: ''
+                rate:         ['Bank FD', 'Bond', 'RBI Bond', 'Government Scheme', 'Post Office'].includes(this.newInv.type) ? (Number(this.newInv.rate) || 0) : 0
             };
+
+            this.investments.push(createdInv);
+
+            // Trigger single price fetch if ticker/schemeCode provided
+            if (createdInv.ticker || createdInv.schemeCode) {
+                this.fetchSinglePrice(createdInv);
+            }
+
+            this.newInv = {
+                name: '', type: 'Stock (IND)', issuer: '', amount: '',
+                rate: '', payout: 'Monthly', rating: '', maturityDate: '',
+                ticker: '', units: '', buyPrice: '', currentPrice: '', schemeCode: ''
+            };
+            this.addingInv = false;
         },
 
         deleteInvestment(id) {
@@ -1279,14 +1308,16 @@ document.addEventListener('alpine:init', () => {
         saveEdit() {
             const idx = this.investments.findIndex(i => i.id === this.editForm.id);
             if (idx !== -1) {
-                const isEquity = ['Stock', 'Equity', 'Mutual Fund', 'ETF'].includes(this.editForm.type);
-                const units = Number(this.editForm.units) || 0;
+                const isEquity = ['Stock', 'Stock (IND)', 'Stock (US)', 'Equity', 'Mutual Fund', 'ETF', 'ETF (IND)', 'ETF (US)'].includes(this.editForm.type);
+                const isUS     = ['Stock (US)', 'ETF (US)'].includes(this.editForm.type);
+                const units    = Number(this.editForm.units) || 0;
                 const buyPrice = Number(this.editForm.buyPrice) || 0;
                 const currentPrice = Number(this.editForm.currentPrice) || buyPrice || 0;
                 
                 let amount = Number(this.editForm.amount) || 0;
                 if (isEquity && units > 0 && (currentPrice > 0 || buyPrice > 0)) {
-                    amount = units * (currentPrice || buyPrice);
+                    const usdRate = isUS ? (this.usdInrRate || 86.5) : 1;
+                    amount = units * (currentPrice || buyPrice) * usdRate;
                 }
 
                 this.editForm.amount       = amount;
@@ -1294,10 +1325,14 @@ document.addEventListener('alpine:init', () => {
                 this.editForm.buyPrice     = buyPrice;
                 this.editForm.currentPrice = currentPrice || buyPrice;
                 this.editForm.currentValue = amount;
-                this.editForm.rate         = Number(this.editForm.rate) || 0;
+                this.editForm.rate         = ['Bank FD', 'Bond', 'RBI Bond', 'Government Scheme', 'Post Office'].includes(this.editForm.type) ? (Number(this.editForm.rate) || 0) : 0;
 
                 this.investments[idx] = { ...this.editForm };
                 this.investments = [...this.investments];
+
+                if (this.editForm.ticker || this.editForm.schemeCode) {
+                    this.fetchSinglePrice(this.investments[idx]);
+                }
             }
             this.editingInv = null;
         },
@@ -2006,8 +2041,10 @@ RULES: Return ONLY valid JSON. No markdown, no explanation. If a field is unknow
             // 2. Stock / ETF via Yahoo Finance chart API
             if (inv.ticker) {
                 try {
+                    const isUS = (inv.type === 'Stock (US)' || inv.type === 'ETF (US)');
                     const cleanSymbol = inv.ticker.trim().toUpperCase().replace(/\.NS$|\.BO$/, '');
-                    const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${cleanSymbol}.NS`;
+                    const querySymbol = isUS ? cleanSymbol : `${cleanSymbol}.NS`;
+                    const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${querySymbol}`;
                     const res = await fetch(yahooUrl);
                     if (res.ok) {
                         const data = await res.json();
@@ -2015,8 +2052,14 @@ RULES: Return ONLY valid JSON. No markdown, no explanation. If a field is unknow
                         const price = meta?.regularMarketPrice || meta?.chartPreviousClose;
                         if (price) {
                             inv.currentPrice = price;
+                            inv.currency = isUS ? 'USD' : 'INR';
+
+                            // Currency conversion to INR for portfolio total valuation
+                            const usdRate = isUS ? (this.usdInrRate || 86.5) : 1;
+                            const priceInINR = price * usdRate;
+
                             if (Number(inv.units) > 0) {
-                                inv.currentValue = Math.round(Number(inv.units) * price * 100) / 100;
+                                inv.currentValue = Math.round(Number(inv.units) * priceInINR * 100) / 100;
                             }
                             inv.lastNavUpdate = new Date().toISOString();
                             return price;

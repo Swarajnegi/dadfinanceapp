@@ -1844,77 +1844,142 @@ No financial goals added yet. Use the form above to add your first goal!
 
 <!-- Add Investment Modal -->
 <div x-show="addingInv" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" x-cloak>
-<div class="bg-[#051424] border border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl p-6 text-white relative">
-<button @click="addingInv = false" class="absolute top-4 right-4 text-white/50 hover:text-white">✕</button>
-    <h3 class="text-lg font-bold text-white mb-4">Add New Investment</h3>
-    <form @submit.prevent="addInvestment" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <input id="inv-name" type="text" x-model="newInv.name" placeholder="Name (e.g. SBI Bond)" required
-            class="px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:ring-2 focus:ring-primary outline-none text-sm">
-        <select x-model="newInv.type" class="px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:ring-2 focus:ring-primary outline-none text-sm">
-            <option>Mutual Fund</option>
-            <option>Stock</option>
-            <option>ETF</option>
-            <option>Bond</option>
-            <option>Bank FD</option>
-            <option>Government Scheme</option>
-            <option>Post Office</option>
-            <option>RBI Bond</option>
-            <option>Cash</option>
-            <option>Other</option>
-        </select>
-        <input type="text" x-model="newInv.issuer" placeholder="Issuer / AMC (e.g. HDFC)"
-            class="px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:ring-2 focus:ring-primary outline-none text-sm">
-        <input type="number" x-model="newInv.amount" placeholder="Amount ₹" required min="1"
-            class="px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:ring-2 focus:ring-primary outline-none text-sm">
-        <input type="number" step="0.01" x-model="newInv.rate" placeholder="Annual return %" min="0" max="100"
-            class="px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:ring-2 focus:ring-primary outline-none text-sm">
-        <select x-model="newInv.payout" class="px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:ring-2 focus:ring-primary outline-none text-sm">
-            <option>Monthly</option>
-            <option>Quarterly</option>
-            <option>Yearly</option>
-            <option>Cumulative</option>
-        </select>
-        <input type="text" x-model="newInv.rating" placeholder="Rating (e.g. AA+)"
-            class="px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:ring-2 focus:ring-primary outline-none text-sm">
-        <input type="date" x-model="newInv.maturityDate"
-            class="px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:ring-2 focus:ring-primary outline-none text-sm">
-        <input type="number" step="0.001" x-model="newInv.units" placeholder="Units (e.g. 150.5)"
-            class="px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:ring-2 focus:ring-primary outline-none text-sm">
-        <input type="number" step="0.01" x-model="newInv.buyPrice" placeholder="Buy Price ₹"
-            class="px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:ring-2 focus:ring-primary outline-none text-sm">
-
-        <!-- AMFI MF Scheme Search (when Mutual Fund is selected) -->
-        <div x-show="newInv.type === 'Mutual Fund'" class="sm:col-span-2 lg:col-span-4 relative mt-1">
-            <label class="block text-xs font-medium text-[#d4af37] mb-1">AMFI Scheme Search (Auto Live NAV)</label>
-            <div class="flex gap-2">
-                <input type="text" x-model="mfSearchQuery" @input.debounce.300ms="searchMfScheme(mfSearchQuery, newInv)" placeholder="Search Mutual Fund name (e.g. Parag Parikh, SBI Small Cap)..." class="flex-1 px-3 py-2 rounded-lg bg-surface-container-lowest border border-[#d4af37]/40 text-white outline-none text-sm focus:border-primary">
-                <button type="button" @click="searchMfScheme(mfSearchQuery, newInv)" class="px-3 py-2 rounded-lg bg-[#d4af37]/20 text-[#d4af37] border border-[#d4af37]/30 text-xs font-semibold hover:bg-[#d4af37]/30">Search</button>
+    <div class="bg-[#051424] border border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl p-6 text-white relative">
+        <button @click="addingInv = false" class="absolute top-4 right-4 text-white/50 hover:text-white">✕</button>
+        <h3 class="text-lg font-bold text-white mb-4">Add New Investment</h3>
+        
+        <form @submit.prevent="addInvestment" class="space-y-4">
+            <!-- Basic Info Row -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-white/70 mb-1">Investment Name *</label>
+                    <input id="inv-name" type="text" x-model="newInv.name" placeholder="e.g. NVIDIA, Reliance, HDFC FD" required
+                           class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-white/70 mb-1">Asset Category *</label>
+                    <select x-model="newInv.type" class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
+                        <option value="Stock (IND)">Stock (IND - NSE / BSE)</option>
+                        <option value="Stock (US)">Stock (US - NASDAQ / NYSE)</option>
+                        <option value="ETF (IND)">ETF (IND - NSE / BSE)</option>
+                        <option value="ETF (US)">ETF (US - NASDAQ / NYSE)</option>
+                        <option value="Mutual Fund">Mutual Fund (AMFI)</option>
+                        <option value="Bank FD">Bank FD (Fixed Deposit)</option>
+                        <option value="Bond">Bond / RBI Bond</option>
+                        <option value="Government Scheme">Government Scheme (PPF / SCSS / NSC)</option>
+                        <option value="Post Office">Post Office Scheme</option>
+                        <option value="Real Estate">Real Estate / Property</option>
+                        <option value="Cash">Cash / Gold / Other</option>
+                    </select>
+                </div>
             </div>
-            <div x-show="newInv.schemeCode" class="text-xs text-primary mt-1" x-text="'Selected AMFI Scheme Code: ' + newInv.schemeCode"></div>
-            <!-- Search Results Dropdown -->
-            <div x-show="mfSearchResults.length > 0" class="absolute z-50 left-0 right-0 top-full mt-1 bg-[#122131] border border-white/10 rounded-xl shadow-2xl max-h-48 overflow-y-auto p-1">
-                <template x-for="scheme in mfSearchResults" :key="scheme.schemeCode">
-                    <div @click="selectMfScheme(newInv, scheme)" class="p-2.5 hover:bg-surface-container-high rounded-lg cursor-pointer text-xs text-white flex justify-between items-center border-b border-white/5">
-                        <span class="font-medium text-white" x-text="scheme.schemeName"></span>
-                        <span class="text-[10px] text-primary font-mono ml-2 shrink-0" x-text="'Code: ' + scheme.schemeCode"></span>
-                    </div>
-                </template>
+
+            <!-- Stock / ETF Ticker Symbol (Conditional) -->
+            <div x-show="['Stock (IND)', 'Stock (US)', 'ETF (IND)', 'ETF (US)', 'Stock', 'ETF'].includes(newInv.type)">
+                <label class="block text-xs font-semibold text-primary mb-1"
+                       x-text="['Stock (US)', 'ETF (US)'].includes(newInv.type) ? 'US Ticker Symbol (NASDAQ/NYSE)' : 'NSE/BSE Ticker Symbol'"></label>
+                <input type="text" x-model="newInv.ticker"
+                       :placeholder="['Stock (US)', 'ETF (US)'].includes(newInv.type) ? 'e.g. NVDA, AAPL, MSFT, TSLA, VOO, QQQ' : 'e.g. RELIANCE, INFY, TATAMOTORS, NIFTYBEES'"
+                       class="w-full px-3.5 py-2.5 rounded-xl bg-surface-container-lowest border border-primary/40 text-white outline-none text-sm uppercase font-mono">
+                <p class="text-[11px] text-on-surface-variant/70 mt-1"
+                   x-text="['Stock (US)', 'ETF (US)'].includes(newInv.type) ? 'Auto-syncs live USD price from Yahoo Finance' : 'Auto-syncs live NAV/price from Yahoo Finance (.NS)'"></p>
             </div>
-        </div>
 
-        <!-- Stock Ticker Symbol input (when Stock or ETF is selected) -->
-        <div x-show="['Stock', 'ETF'].includes(newInv.type)" class="sm:col-span-2 lg:col-span-4 mt-1">
-            <label class="block text-xs font-medium text-primary mb-1">NSE Ticker Symbol</label>
-            <input type="text" x-model="newInv.ticker" placeholder="e.g. RELIANCE, INFY, TATAMOTORS, NIFTYBEES" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-primary/40 text-white outline-none text-sm uppercase">
-        </div>
+            <!-- AMFI MF Scheme Search (when Mutual Fund is selected) -->
+            <div x-show="newInv.type === 'Mutual Fund'" class="relative">
+                <label class="block text-xs font-semibold text-[#d4af37] mb-1">AMFI Scheme Search (Auto Live NAV)</label>
+                <div class="flex gap-2">
+                    <input type="text" x-model="mfSearchQuery" @input.debounce.300ms="searchMfScheme(mfSearchQuery, newInv)"
+                           placeholder="Search Mutual Fund name (e.g. Parag Parikh, SBI Small Cap)..."
+                           class="flex-1 px-3 py-2 rounded-xl bg-surface-container-lowest border border-[#d4af37]/40 text-white outline-none text-sm focus:border-primary">
+                    <button type="button" @click="searchMfScheme(mfSearchQuery, newInv)"
+                            class="px-3.5 py-2 rounded-xl bg-[#d4af37]/20 text-[#d4af37] border border-[#d4af37]/30 text-xs font-semibold hover:bg-[#d4af37]/30">
+                        Search
+                    </button>
+                </div>
+                <div x-show="newInv.schemeCode" class="text-xs text-primary mt-1 font-mono" x-text="'Selected AMFI Scheme Code: ' + newInv.schemeCode"></div>
+                <!-- Search Results Dropdown -->
+                <div x-show="mfSearchResults.length > 0" class="absolute z-50 left-0 right-0 top-full mt-1 bg-[#122131] border border-white/10 rounded-xl shadow-2xl max-h-48 overflow-y-auto p-1">
+                    <template x-for="scheme in mfSearchResults" :key="scheme.schemeCode">
+                        <div @click="selectMfScheme(newInv, scheme)" class="p-2.5 hover:bg-surface-container-high rounded-lg cursor-pointer text-xs text-white flex justify-between items-center border-b border-white/5">
+                            <span class="font-medium text-white" x-text="scheme.schemeName"></span>
+                            <span class="text-[10px] text-primary font-mono ml-2 shrink-0" x-text="'Code: ' + scheme.schemeCode"></span>
+                        </div>
+                    </template>
+                </div>
+            </div>
 
-        <div class="sm:col-span-2 lg:col-span-4 mt-2">
-            <button type="submit" class="w-full bg-primary text-on-primary font-medium py-2.5 px-4 rounded-lg hover:brightness-110 transition-colors text-sm shadow-md">
-                + Add Investment
-            </button>
-        </div>
-    </form>
-</div>
+            <!-- Quantities & Buy Price (For Stocks / ETFs / Mutual Funds) -->
+            <div x-show="['Stock (IND)', 'Stock (US)', 'ETF (IND)', 'ETF (US)', 'Mutual Fund', 'Stock', 'ETF'].includes(newInv.type)"
+                 class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-white/70 mb-1"
+                           x-text="['Stock (US)', 'ETF (US)'].includes(newInv.type) ? 'Number of Shares' : 'Number of Units'"></label>
+                    <input type="number" step="0.001" x-model="newInv.units" placeholder="e.g. 10"
+                           class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm font-mono">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-white/70 mb-1"
+                           x-text="['Stock (US)', 'ETF (US)'].includes(newInv.type) ? 'Avg Buy Price ($ USD)' : 'Avg Buy Price (₹ INR)'"></label>
+                    <input type="number" step="0.01" x-model="newInv.buyPrice" placeholder="e.g. 130"
+                           class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm font-mono">
+                </div>
+            </div>
+
+            <!-- Amount / Total Value Row -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-white/70 mb-1"
+                           x-text="['Stock (US)', 'ETF (US)'].includes(newInv.type) ? 'Total Value in INR ₹ (Auto-converted)' : 'Total Invested Value (₹)'"></label>
+                    <input type="number" x-model="newInv.amount" placeholder="Total ₹ value" min="1"
+                           class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm font-mono">
+                </div>
+                
+                <!-- Issuer / AMC Name -->
+                <div x-show="!['Stock (IND)', 'Stock (US)', 'ETF (IND)', 'ETF (US)'].includes(newInv.type)">
+                    <label class="block text-xs font-semibold text-white/70 mb-1">Issuer / AMC / Bank Name</label>
+                    <input type="text" x-model="newInv.issuer" placeholder="e.g. HDFC Bank, SBI"
+                           class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
+                </div>
+            </div>
+
+            <!-- Fixed Return Fields: ONLY SHOWN FOR FDs, Bonds, Government Schemes -->
+            <div x-show="['Bank FD', 'Bond', 'RBI Bond', 'Government Scheme', 'Post Office'].includes(newInv.type)"
+                 class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/5">
+                <div>
+                    <label class="block text-xs font-semibold text-[#d4af37] mb-1">Guaranteed Interest Rate (%) *</label>
+                    <input type="number" step="0.01" x-model="newInv.rate" placeholder="e.g. 7.5%" min="0" max="100"
+                           class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-[#d4af37]/30 text-white focus:border-primary outline-none text-sm font-mono">
+                </div>
+                <div x-show="['Bank FD', 'Bond', 'RBI Bond'].includes(newInv.type)">
+                    <label class="block text-xs font-semibold text-white/70 mb-1">Payout Frequency</label>
+                    <select x-model="newInv.payout" class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
+                        <option value="Monthly">Monthly</option>
+                        <option value="Quarterly">Quarterly</option>
+                        <option value="Yearly">Yearly</option>
+                        <option value="Cumulative">Cumulative / On Maturity</option>
+                    </select>
+                </div>
+                <div x-show="['Bond', 'RBI Bond'].includes(newInv.type)">
+                    <label class="block text-xs font-semibold text-white/70 mb-1">Credit Rating (e.g. AAA, AA+)</label>
+                    <input type="text" x-model="newInv.rating" placeholder="e.g. AAA"
+                           class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-white/70 mb-1">Maturity Date</label>
+                    <input type="date" x-model="newInv.maturityDate"
+                           class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <div class="pt-3">
+                <button type="submit" class="w-full bg-primary text-on-primary font-bold py-3 px-4 rounded-xl hover:brightness-110 transition-all text-sm shadow-lg">
+                    + Add Investment
+                </button>
+            </div>
+        </form>
+    </div>
 </div>
 
 <!-- Add SIP Modal -->
@@ -2040,88 +2105,126 @@ No financial goals added yet. Use the form above to add your first goal!
      x-transition:leave-end="opacity-0"
      x-cloak
      style="display:none">
-    <div class="bg-[#051424] border border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl p-6"
+    <div class="bg-[#051424] border border-white/10 rounded-2xl shadow-2xl w-full max-w-2xl p-6 text-white"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0 scale-95"
          x-transition:enter-end="opacity-100 scale-100">
-        <div class="flex justify-between items-center mb-5">
+        <div class="flex justify-between items-center mb-4">
             <h3 class="text-lg font-bold text-white">Edit Investment</h3>
             <button @click="cancelEdit()" class="text-slate-400 hover:text-white p-1">
                 <span class="material-symbols-outlined">close</span>
             </button>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
-            <div>
-                <label class="block text-xs font-medium text-white/70 mb-1">Name</label>
-                <input type="text" x-model="editForm.name" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
+
+        <form @submit.prevent="saveEdit()" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-white/70 mb-1">Name *</label>
+                    <input type="text" x-model="editForm.name" required
+                           class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-white/70 mb-1">Type *</label>
+                    <select x-model="editForm.type" class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
+                        <option value="Stock (IND)">Stock (IND - NSE / BSE)</option>
+                        <option value="Stock (US)">Stock (US - NASDAQ / NYSE)</option>
+                        <option value="ETF (IND)">ETF (IND - NSE / BSE)</option>
+                        <option value="ETF (US)">ETF (US - NASDAQ / NYSE)</option>
+                        <option value="Mutual Fund">Mutual Fund (AMFI)</option>
+                        <option value="Bank FD">Bank FD (Fixed Deposit)</option>
+                        <option value="Bond">Bond / RBI Bond</option>
+                        <option value="Government Scheme">Government Scheme (PPF / SCSS / NSC)</option>
+                        <option value="Post Office">Post Office Scheme</option>
+                        <option value="Real Estate">Real Estate / Property</option>
+                        <option value="Cash">Cash / Gold / Other</option>
+                    </select>
+                </div>
             </div>
-            <div>
-                <label class="block text-xs font-medium text-white/70 mb-1">Type</label>
-                <select x-model="editForm.type" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
-                    <option>Mutual Fund</option><option>Stock</option><option>ETF</option>
-                    <option>Bond</option><option>Bank FD</option><option>Government Scheme</option>
-                    <option>Post Office</option><option>RBI Bond</option><option>Cash</option><option>Other</option>
-                </select>
+
+            <!-- Ticker Symbol (Conditional) -->
+            <div x-show="['Stock (IND)', 'Stock (US)', 'ETF (IND)', 'ETF (US)', 'Stock', 'ETF'].includes(editForm.type)">
+                <label class="block text-xs font-semibold text-primary mb-1"
+                       x-text="['Stock (US)', 'ETF (US)'].includes(editForm.type) ? 'US Ticker Symbol (NASDAQ/NYSE)' : 'NSE/BSE Ticker Symbol'"></label>
+                <input type="text" x-model="editForm.ticker" placeholder="e.g. NVDA or RELIANCE"
+                       class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-primary/40 text-white focus:border-primary outline-none text-sm uppercase font-mono">
             </div>
-            <div>
-                <label class="block text-xs font-medium text-white/70 mb-1">Issuer / AMC</label>
-                <input type="text" x-model="editForm.issuer" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
+
+            <!-- AMFI Scheme Code (Conditional) -->
+            <div x-show="editForm.type === 'Mutual Fund'">
+                <label class="block text-xs font-semibold text-[#d4af37] mb-1">AMFI Scheme Code</label>
+                <input type="text" x-model="editForm.schemeCode" placeholder="e.g. 119551"
+                       class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-[#d4af37]/40 text-white focus:border-primary outline-none text-sm font-mono">
             </div>
-            <div>
-                <label class="block text-xs font-medium text-white/70 mb-1">Amount / Value (₹)</label>
-                <input type="number" x-model="editForm.amount" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
+
+            <!-- Quantities & Buy Price -->
+            <div x-show="['Stock (IND)', 'Stock (US)', 'ETF (IND)', 'ETF (US)', 'Mutual Fund', 'Stock', 'ETF'].includes(editForm.type)"
+                 class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-white/70 mb-1"
+                           x-text="['Stock (US)', 'ETF (US)'].includes(editForm.type) ? 'Number of Shares' : 'Number of Units'"></label>
+                    <input type="number" step="0.001" x-model="editForm.units" placeholder="e.g. 10"
+                           class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm font-mono">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-white/70 mb-1"
+                           x-text="['Stock (US)', 'ETF (US)'].includes(editForm.type) ? 'Avg Buy Price ($ USD)' : 'Avg Buy Price (₹ INR)'"></label>
+                    <input type="number" step="0.01" x-model="editForm.buyPrice" placeholder="e.g. 130"
+                           class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm font-mono">
+                </div>
             </div>
-            <div>
-                <label class="block text-xs font-medium text-white/70 mb-1">Annual Return (%)</label>
-                <input type="number" step="0.01" x-model="editForm.rate" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
+
+            <!-- Amount / Total Value -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-white/70 mb-1">Amount / Value (₹)</label>
+                    <input type="number" x-model="editForm.amount"
+                           class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm font-mono">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-white/70 mb-1">Issuer / AMC / Bank</label>
+                    <input type="text" x-model="editForm.issuer"
+                           class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
+                </div>
             </div>
-            <div>
-                <label class="block text-xs font-medium text-white/70 mb-1">Payout Frequency</label>
-                <select x-model="editForm.payout" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
-                    <option>Monthly</option><option>Quarterly</option><option>Yearly</option><option>Cumulative</option>
-                </select>
+
+            <!-- Fixed Return Fields: ONLY SHOWN FOR FDs, Bonds, Government Schemes -->
+            <div x-show="['Bank FD', 'Bond', 'RBI Bond', 'Government Scheme', 'Post Office'].includes(editForm.type)"
+                 class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/5">
+                <div>
+                    <label class="block text-xs font-semibold text-[#d4af37] mb-1">Annual Interest Rate (%)</label>
+                    <input type="number" step="0.01" x-model="editForm.rate" placeholder="e.g. 7.5%"
+                           class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-[#d4af37]/30 text-white focus:border-primary outline-none text-sm font-mono">
+                </div>
+                <div x-show="['Bank FD', 'Bond', 'RBI Bond'].includes(editForm.type)">
+                    <label class="block text-xs font-semibold text-white/70 mb-1">Payout Frequency</label>
+                    <select x-model="editForm.payout" class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
+                        <option value="Monthly">Monthly</option>
+                        <option value="Quarterly">Quarterly</option>
+                        <option value="Yearly">Yearly</option>
+                        <option value="Cumulative">Cumulative</option>
+                    </select>
+                </div>
+                <div x-show="['Bond', 'RBI Bond'].includes(editForm.type)">
+                    <label class="block text-xs font-semibold text-white/70 mb-1">Rating (e.g. AA+)</label>
+                    <input type="text" x-model="editForm.rating"
+                           class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-white/70 mb-1">Maturity Date</label>
+                    <input type="date" x-model="editForm.maturityDate"
+                           class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
+                </div>
             </div>
-            <div>
-                <label class="block text-xs font-medium text-white/70 mb-1">AMFI Scheme Code</label>
-                <input type="text" x-model="editForm.schemeCode" placeholder="e.g. 119551" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-[#d4af37]/40 text-white focus:border-primary outline-none text-sm font-mono">
+
+            <div class="flex space-x-3 pt-3">
+                <button type="submit" class="flex-1 bg-primary text-on-primary font-bold py-3 rounded-xl transition-all text-sm hover:brightness-110 shadow-md">
+                    Save Changes
+                </button>
+                <button type="button" @click="cancelEdit()" class="flex-1 bg-surface-container-high hover:bg-surface-bright text-white font-medium py-3 rounded-xl transition-all text-sm">
+                    Cancel
+                </button>
             </div>
-            <div>
-                <label class="block text-xs font-medium text-white/70 mb-1">NSE Ticker Symbol</label>
-                <input type="text" x-model="editForm.ticker" placeholder="e.g. RELIANCE" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-primary/40 text-white focus:border-primary outline-none text-sm uppercase">
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-white/70 mb-1">Units</label>
-                <input type="number" step="0.001" x-model="editForm.units" placeholder="e.g. 150.5" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-white/70 mb-1">Current Price / NAV (₹)</label>
-                <input type="number" step="0.01" x-model="editForm.currentPrice" placeholder="Auto-synced or manual" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-white/70 mb-1">Rating (e.g. AA+)</label>
-                <input type="text" x-model="editForm.rating" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-white/70 mb-1">Maturity Date</label>
-                <input type="date" x-model="editForm.maturityDate" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-white/70 mb-1">Purchase Date</label>
-                <input type="date" x-model="editForm.purchaseDate" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
-            </div>
-            <div>
-                <label class="block text-xs font-medium text-white/70 mb-1">Buy Price / Unit (₹)</label>
-                <input type="number" step="0.01" x-model="editForm.buyPrice" placeholder="e.g. 150" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white focus:border-primary outline-none text-sm">
-            </div>
-        </div>
-        <div class="flex space-x-3">
-            <button @click="saveEdit()" class="flex-1 bg-primary text-on-primary font-medium py-2.5 rounded-lg transition-colors text-sm hover:brightness-110">
-                Save Changes
-            </button>
-            <button @click="cancelEdit()" class="flex-1 bg-surface-container-high hover:bg-surface-bright text-white font-medium py-2.5 rounded-lg transition-colors text-sm">
-                Cancel
-            </button>
-        </div>
+        </form>
     </div>
 </div>
 
