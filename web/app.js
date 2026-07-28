@@ -141,6 +141,7 @@ document.addEventListener('alpine:init', () => {
             provider:     'auto', // 'auto' | 'gemini' | 'openrouter' | 'openai'
             model:        'google/gemini-2.0-flash-exp:free',
             customModel:  '',
+            activeTab:    null,   // 'key' | 'settings' | null
             apiKeySet:    false,
             showKeyInput: false,
             loading:      false,
@@ -2191,6 +2192,7 @@ RULES: Return ONLY valid JSON. No markdown, no explanation. If a field is unknow
 
             this.regenWealth.apiKeySet    = true;
             this.regenWealth.showKeyInput = false;
+            this.regenWealth.activeTab    = null; // Close key panel on save
             this.regenWealth.error        = '';
         },
 
@@ -2204,6 +2206,7 @@ RULES: Return ONLY valid JSON. No markdown, no explanation. If a field is unknow
             this.regenWealth.apiKey       = '';
             this.regenWealth.apiKeySet    = false;
             this.regenWealth.showKeyInput = false;
+            this.regenWealth.activeTab    = 'key';
             this.regenWealth.analysis     = null;
             window.RegenWealth?.clearCache();
         },
@@ -2222,6 +2225,7 @@ RULES: Return ONLY valid JSON. No markdown, no explanation. If a field is unknow
             }
             if (!this.regenWealth.apiKeySet) {
                 this.regenWealth.showKeyInput = true;
+                this.regenWealth.activeTab    = 'key';
                 return;
             }
 

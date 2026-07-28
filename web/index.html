@@ -1059,92 +1059,167 @@ Restore from JSON
 </div>
 </div>
 
-<!-- Multi-Provider Universal AI Key Card -->
+<!-- Clean Universal AI Key Card -->
 <div class="bg-gradient-to-br from-[#122131] to-[#0d1c2d] border border-[#d4af37]/30 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div class="flex items-start gap-3">
-            <span class="material-symbols-outlined text-[#d4af37] text-2xl mt-0.5">vpn_key</span>
-            <div>
-                <h3 class="font-bold text-white text-base">Connect AI Key (OpenRouter / Gemini / OpenAI)</h3>
-                <p class="text-xs text-on-surface-variant mt-0.5 max-w-xl">
-                    Supports OpenRouter (<code class="text-[#d4af37] font-mono">sk-or-v1-...</code>), direct Gemini (<code class="text-emerald-400 font-mono">AIzaSy...</code>), or OpenAI (<code class="text-sky-400 font-mono">sk-...</code>). Stored safely in device localStorage.
-                </p>
-            </div>
+    <div class="flex items-center justify-between gap-3">
+        <!-- Clean Uncongested Title -->
+        <div class="flex items-center gap-3 min-w-0">
+            <span class="material-symbols-outlined text-[#d4af37] text-2xl shrink-0">vpn_key</span>
+            <h3 class="font-bold text-white text-base truncate">Connect any AI Key</h3>
         </div>
 
-        <template x-if="regenWealth.apiKeySet && !regenWealth.showKeyInput">
-            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                <div class="flex items-center gap-2 bg-emerald-950/40 border border-emerald-500/30 px-3.5 py-1.5 rounded-xl">
+        <!-- Header Actions: Active Status Badge + Squircle Action Buttons -->
+        <div class="flex items-center gap-2 shrink-0">
+            <!-- Active Key Status Badge -->
+            <template x-if="regenWealth.apiKeySet">
+                <div class="hidden sm:flex items-center gap-2 bg-emerald-950/50 border border-emerald-500/30 px-3 py-1.5 rounded-xl">
                     <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
                     <span class="text-xs font-semibold text-emerald-300"
-                          x-text="regenWealth.apiKey.startsWith('sk-or-') ? 'OpenRouter Key Active' : regenWealth.apiKey.startsWith('AIza') ? 'Gemini Key Active' : 'AI Key Active'"></span>
+                          x-text="regenWealth.apiKey.startsWith('sk-or-') ? 'OpenRouter Active' : regenWealth.apiKey.startsWith('AIza') ? 'Gemini Active' : 'AI Active'"></span>
                 </div>
-                <button @click="regenWealth.showKeyInput = true" class="text-xs text-on-surface-variant hover:text-white underline ml-1">
-                    Settings / Change
-                </button>
-            </div>
-        </template>
+            </template>
+
+            <!-- Squircle Button 1: Key Symbol Button -->
+            <button type="button"
+                    @click="regenWealth.activeTab = (regenWealth.activeTab === 'key' ? null : 'key')"
+                    class="w-10 h-10 rounded-xl border flex items-center justify-center transition-all shadow-sm group"
+                    :class="regenWealth.activeTab === 'key' ? 'bg-[#d4af37]/20 border-[#d4af37] text-[#d4af37]' : 'bg-surface-container-high border-white/10 text-white/70 hover:text-white hover:bg-surface-bright'"
+                    title="Key Management & Supported Providers">
+                <span class="material-symbols-outlined text-[20px]">vpn_key</span>
+            </button>
+
+            <!-- Squircle Button 2: Cog / Settings Button -->
+            <button type="button"
+                    @click="regenWealth.activeTab = (regenWealth.activeTab === 'settings' ? null : 'settings')"
+                    class="w-10 h-10 rounded-xl border flex items-center justify-center transition-all shadow-sm group"
+                    :class="regenWealth.activeTab === 'settings' ? 'bg-[#d4af37]/20 border-[#d4af37] text-[#d4af37]' : 'bg-surface-container-high border-white/10 text-white/70 hover:text-white hover:bg-surface-bright'"
+                    title="Model Switcher & Engine Settings">
+                <span class="material-symbols-outlined text-[20px]">settings</span>
+            </button>
+        </div>
     </div>
 
-    <!-- Key Input & Model Settings Row -->
-    <div x-show="!regenWealth.apiKeySet || regenWealth.showKeyInput" class="mt-4 pt-4 border-t border-white/5 space-y-4">
+    <!-- Active Key Badge for Mobile (under header) -->
+    <template x-if="regenWealth.apiKeySet">
+        <div class="flex sm:hidden items-center gap-2 mt-3 bg-emerald-950/40 border border-emerald-500/30 px-3 py-1.5 rounded-xl w-fit">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <span class="text-xs font-semibold text-emerald-300"
+                  x-text="regenWealth.apiKey.startsWith('sk-or-') ? 'OpenRouter Key Active' : regenWealth.apiKey.startsWith('AIza') ? 'Gemini Key Active' : 'AI Key Active'"></span>
+        </div>
+    </template>
+
+    <!-- Error Message Display -->
+    <div x-show="regenWealth.error" class="mt-3 text-xs text-red-400 font-semibold bg-red-950/30 border border-red-500/20 px-3 py-2 rounded-lg" x-text="regenWealth.error"></div>
+
+    <!-- TAB 1: Key Management Panel (Toggled by Key Squircle Button or when no key set) -->
+    <div x-show="regenWealth.activeTab === 'key' || (!regenWealth.apiKeySet && regenWealth.activeTab !== 'settings')"
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 -translate-y-1"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         class="mt-4 pt-4 border-t border-white/10 space-y-4">
+        
+        <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[16px] text-[#d4af37]">key</span>
+                API Key Management
+            </span>
+            <span class="text-[10px] text-white/40 font-mono">100% Client-Side Local Storage</span>
+        </div>
+
         <div class="flex flex-col sm:flex-row gap-3">
             <input type="password" x-model="regenWealth.apiKey"
-                   placeholder="Paste OpenRouter (sk-or-v1-...), Gemini (AIzaSy...), or OpenAI key..."
-                   class="flex-1 px-4 py-2.5 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-[#d4af37] outline-none text-sm placeholder:text-on-surface-variant/40 font-mono">
-            <button @click="saveRegenApiKey()" class="bg-[#d4af37] text-black font-bold px-5 py-2.5 rounded-xl hover:brightness-110 transition-all text-sm shrink-0 shadow-md">
-                Save Settings
+                   placeholder="Paste your API key (sk-or-v1-..., AIzaSy..., or sk-...)"
+                   class="flex-1 px-4 py-2.5 rounded-xl bg-surface-container-lowest border border-white/10 text-white focus:border-[#d4af37] outline-none text-xs placeholder:text-on-surface-variant/40 font-mono">
+            <button @click="saveRegenApiKey()" class="bg-[#d4af37] text-black font-bold px-5 py-2.5 rounded-xl hover:brightness-110 transition-all text-xs shrink-0 shadow-md">
+                Save Key
             </button>
-            <button x-show="regenWealth.apiKeySet" @click="clearRegenApiKey()" class="bg-surface-container-high text-white font-medium px-4 py-2.5 rounded-xl hover:bg-surface-bright transition-all text-sm shrink-0">
+            <button x-show="regenWealth.apiKeySet" @click="clearRegenApiKey()" class="bg-surface-container-high text-white font-medium px-4 py-2.5 rounded-xl hover:bg-surface-bright transition-all text-xs shrink-0">
                 Remove Key
             </button>
         </div>
 
-        <!-- Provider & Model Configuration Selector -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/5">
-            <div>
-                <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">Provider Detection</label>
-                <select x-model="regenWealth.provider" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white text-xs outline-none focus:border-[#d4af37]">
-                    <option value="auto">Auto-Detect from Key</option>
-                    <option value="openrouter">OpenRouter API</option>
-                    <option value="gemini">Google Gemini Direct API</option>
-                    <option value="openai">OpenAI Direct API</option>
-                </select>
-            </div>
+        <!-- Supported Key Types & Links Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2">
+            <a href="https://openrouter.ai/keys" target="_blank"
+               class="p-3 rounded-xl bg-surface-container-lowest/60 border border-white/5 hover:border-[#d4af37]/40 transition-all group">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-semibold text-white group-hover:text-[#d4af37] transition-colors">OpenRouter</span>
+                    <span class="text-[10px] text-[#d4af37] font-mono">sk-or-v1-...</span>
+                </div>
+                <p class="text-[10px] text-on-surface-variant leading-tight">Access 100+ models (Gemini, Llama, DeepSeek) →</p>
+            </a>
 
-            <div>
-                <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">Model Selection (OpenRouter / OpenAI)</label>
-                <select x-model="regenWealth.model" class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white text-xs outline-none focus:border-[#d4af37]">
-                    <option value="google/gemini-2.0-flash-exp:free">Gemini 2.0 Flash (Free Tier — google/gemini-2.0-flash-exp:free)</option>
-                    <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash Paid (google/gemini-2.0-flash-001)</option>
-                    <option value="meta-llama/llama-3.3-70b-instruct:free">Llama 3.3 70B (Free — meta-llama/llama-3.3-70b-instruct:free)</option>
-                    <option value="deepseek/deepseek-r1:free">DeepSeek R1 (Free — deepseek/deepseek-r1:free)</option>
-                    <option value="openai/gpt-4o-mini">GPT-4o Mini (openai/gpt-4o-mini)</option>
-                    <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (anthropic/claude-3.5-sonnet)</option>
-                    <option value="custom">Custom Model String...</option>
-                </select>
-            </div>
-        </div>
+            <a href="https://aistudio.google.com/app/apikey" target="_blank"
+               class="p-3 rounded-xl bg-surface-container-lowest/60 border border-white/5 hover:border-emerald-400/40 transition-all group">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-semibold text-white group-hover:text-emerald-400 transition-colors">Google Gemini</span>
+                    <span class="text-[10px] text-emerald-400 font-mono">AIzaSy...</span>
+                </div>
+                <p class="text-[10px] text-on-surface-variant leading-tight">Free direct API keys from AI Studio →</p>
+            </a>
 
-        <!-- Custom Model Input if 'custom' selected -->
-        <div x-show="regenWealth.model === 'custom'" class="pt-1">
-            <input type="text" x-model="regenWealth.customModel" placeholder="e.g. mistralai/mistral-large-2411 or qwen/qwen-2.5-72b-instruct"
-                   class="w-full px-3 py-2 rounded-lg bg-surface-container-lowest border border-white/10 text-white text-xs font-mono outline-none focus:border-[#d4af37]">
+            <a href="https://platform.openai.com/api-keys" target="_blank"
+               class="p-3 rounded-xl bg-surface-container-lowest/60 border border-white/5 hover:border-sky-400/40 transition-all group">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-semibold text-white group-hover:text-sky-400 transition-colors">OpenAI</span>
+                    <span class="text-[10px] text-sky-400 font-mono">sk-...</span>
+                </div>
+                <p class="text-[10px] text-on-surface-variant leading-tight">Direct GPT-4o / GPT-4o-mini keys →</p>
+            </a>
         </div>
     </div>
 
-    <!-- Quick Help Links & Provider Detected Badge -->
-    <div class="mt-3 flex flex-wrap justify-between items-center gap-2 text-[11px] text-on-surface-variant">
-        <div class="flex items-center gap-3">
-            <a href="https://openrouter.ai/keys" target="_blank" class="text-[#d4af37] hover:underline flex items-center gap-1">
-                OpenRouter Keys → openrouter.ai/keys
-            </a>
-            <span>•</span>
-            <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-emerald-400 hover:underline flex items-center gap-1">
-                Gemini Keys → aistudio.google.com
-            </a>
+    <!-- TAB 2: Model Switcher & Settings Panel (Toggled by Cog Squircle Button) -->
+    <div x-show="regenWealth.activeTab === 'settings'"
+         x-transition:enter="transition ease-out duration-150"
+         x-transition:enter-start="opacity-0 -translate-y-1"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         class="mt-4 pt-4 border-t border-white/10 space-y-4">
+
+        <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-white flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[16px] text-[#d4af37]">tune</span>
+                Model Switcher &amp; Provider Settings
+            </span>
+            <span class="text-[10px] text-[#d4af37] font-semibold"
+                  x-text="regenWealth.model === 'custom' ? (regenWealth.customModel || 'Custom') : regenWealth.model"></span>
         </div>
-        <span x-show="regenWealth.error" class="text-red-400 font-semibold" x-text="regenWealth.error"></span>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+                <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">Provider Detection Mode</label>
+                <select x-model="regenWealth.provider" @change="saveRegenApiKey()" class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white text-xs outline-none focus:border-[#d4af37]">
+                    <option value="auto">Auto-Detect from Key Prefix</option>
+                    <option value="openrouter">Force OpenRouter API</option>
+                    <option value="gemini">Force Google Gemini Direct API</option>
+                    <option value="openai">Force OpenAI Direct API</option>
+                </select>
+            </div>
+
+            <div>
+                <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">Active Model (OpenRouter / OpenAI)</label>
+                <select x-model="regenWealth.model" @change="saveRegenApiKey()" class="w-full px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white text-xs outline-none focus:border-[#d4af37]">
+                    <option value="google/gemini-2.0-flash-exp:free">✨ Gemini 2.0 Flash (Free Tier — google/gemini-2.0-flash-exp:free)</option>
+                    <option value="google/gemini-2.0-flash-001">Gemini 2.0 Flash Paid (google/gemini-2.0-flash-001)</option>
+                    <option value="meta-llama/llama-3.3-70b-instruct:free">🦙 Llama 3.3 70B (Free — meta-llama/llama-3.3-70b-instruct:free)</option>
+                    <option value="deepseek/deepseek-r1:free">🐋 DeepSeek R1 (Free — deepseek/deepseek-r1:free)</option>
+                    <option value="openai/gpt-4o-mini">⚡ GPT-4o Mini (openai/gpt-4o-mini)</option>
+                    <option value="anthropic/claude-3.5-sonnet">🧠 Claude 3.5 Sonnet (anthropic/claude-3.5-sonnet)</option>
+                    <option value="custom">⚙️ Custom Model String...</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Custom Model Input string -->
+        <div x-show="regenWealth.model === 'custom'" class="pt-1">
+            <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">Custom OpenRouter Model ID</label>
+            <div class="flex gap-2">
+                <input type="text" x-model="regenWealth.customModel"
+                       placeholder="e.g. mistralai/mistral-large-2411 or qwen/qwen-2.5-72b-instruct"
+                       class="flex-1 px-3 py-2 rounded-xl bg-surface-container-lowest border border-white/10 text-white text-xs font-mono outline-none focus:border-[#d4af37]">
+                <button @click="saveRegenApiKey()" class="bg-[#d4af37] text-black font-bold px-4 py-2 rounded-xl text-xs">Apply</button>
+            </div>
+        </div>
     </div>
 </div>
 
