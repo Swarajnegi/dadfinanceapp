@@ -248,7 +248,7 @@ ${hasNews
 
         // 1. OpenRouter API Call
         if (provider === 'openrouter') {
-            const model = options.model || 'google/gemini-2.0-flash-001';
+            const model = options.model || 'google/gemini-2.0-flash-exp:free';
             const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method:  'POST',
                 headers: {

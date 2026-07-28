@@ -139,7 +139,7 @@ document.addEventListener('alpine:init', () => {
         regenWealth: {
             apiKey:       '',
             provider:     'auto', // 'auto' | 'gemini' | 'openrouter' | 'openai'
-            model:        'google/gemini-2.0-flash-001',
+            model:        'google/gemini-2.0-flash-exp:free',
             customModel:  '',
             apiKeySet:    false,
             showKeyInput: false,
@@ -181,7 +181,7 @@ document.addEventListener('alpine:init', () => {
                 this.regenWealth.apiKey       = savedKey;
                 this.regenWealth.apiKeySet    = true;
                 this.regenWealth.provider     = localStorage.getItem('rfm_api_provider') || 'auto';
-                this.regenWealth.model        = localStorage.getItem('rfm_api_model') || 'google/gemini-2.0-flash-001';
+                this.regenWealth.model        = localStorage.getItem('rfm_api_model') || 'google/gemini-2.0-flash-exp:free';
                 this.regenWealth.customModel = localStorage.getItem('rfm_api_custom_model') || '';
             }
             const cached = window.RegenWealth?.loadCached();
